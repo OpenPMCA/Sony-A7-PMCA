@@ -38,6 +38,8 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
     'getReadOnlyCameraInfo': self.mock_read_only,
     'syncCatalogMetadata': Mock(return_value=({}, False)),
     'checkCameraConnection': Mock(return_value=None),
+    'askyesno': Mock(return_value=True),
+    'showerror': Mock(),
    }),
    patch('pmca.commands.usb.getReadOnlyCameraInfo', self.mock_read_only),
    patch('pmca.commands.usb.infoCommand', self.mock_info_cmd),
@@ -547,7 +549,11 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   self.assertEqual(str(root.installerFrame.installButton['state']), 'disabled')
 
   # 3. Simulate InfoTask running and applying camera properties
-  with patch.dict(self.gui, {'infoCommand': Mock(return_value=mock_info_data)}):
+  with patch.dict(self.gui, {
+   'infoCommand': Mock(return_value=mock_info_data),
+   'askyesno': Mock(return_value=True),
+   'showerror': Mock(),
+  }):
    task = self.gui['InfoTask'](root.infoFrame)
    driver = task.doBefore()
    self.assertNotEqual(driver, False)
@@ -569,6 +575,74 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.update()
   root.clearLog()
   self.assertEqual(root.logText.text.get('1.0', 'end').strip(), '')
+
+  root.close()
+
+ def test_gui_header_and_footer_display_v1_1_0(self):
+  root = self.gui['MainUi']('Test Version Presentation', installerOnly=True)
+  root.withdraw()
+  root.update()
+
+  labels = []
+  def collect_labels(widget):
+   for child in widget.winfo_children():
+    if child.winfo_class() == 'TLabel':
+     try:
+      txt = child.cget('text')
+      if txt:
+       labels.append(txt)
+     except Exception:
+      pass
+    collect_labels(child)
+  collect_labels(root)
+
+  self.assertTrue(any(lbl == 'v1.1.0' for lbl in labels), f"Header version label must show exactly 'v1.1.0', found: {labels}")
+  self.assertTrue(any(lbl == 'Version 1.1.0' for lbl in labels), f"Footer version label must show exactly 'Version 1.1.0', found: {labels}")
+
+  root.close()
+
+ def test_close_and_destroy_cancels_pending_queue_timer_and_aborts_workers(self):
+  root = self.gui['MainUi']('Test Timer Cancellation', installerOnly=True)
+  root.withdraw()
+  root.update()
+
+  self.assertTrue(hasattr(root, "_queueAfterId"))
+  self.assertIsNotNone(root._queueAfterId)
+  self.assertFalse(root.abortMonitor.is_set())
+  self.assertFalse(root.abortSync.is_set())
+
+  # Verify _queueAfterId is actively registered in Tk after table
+  active_timers = root.tk.call('after', 'info')
+  self.assertIn(root._queueAfterId, active_timers)
+
+  root.close()
+  self.assertTrue(getattr(root, "_closed", False))
+  self.assertTrue(root.abortMonitor.is_set())
+  self.assertTrue(root.abortSync.is_set())
+  self.assertIsNone(root._queueAfterId)
+
+ def test_process_queue_logs_traceback_on_callback_crash_and_continues_processing(self):
+  root = self.gui['MainUi']('Test Queue Robustness', installerOnly=True)
+  root.withdraw()
+  root.update()
+
+  executed = []
+  def failing_cb():
+   executed.append('first')
+   raise RuntimeError("Test callback exception")
+
+  def succeeding_cb():
+   executed.append('second')
+
+  mock_print_exc = Mock()
+  with patch('traceback.print_exc', mock_print_exc):
+   root.run(failing_cb)
+   root.run(succeeding_cb)
+   root._processQueue()
+
+  self.assertEqual(executed, ['first', 'second'], "Following callback must still run when previous callback raises")
+  mock_print_exc.assert_called_once()
+  self.assertIsNotNone(root._queueAfterId)
 
   root.close()
 

@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import re
 import unittest
 from unittest.mock import patch
@@ -170,7 +171,7 @@ class HomebrewCaskTest(unittest.TestCase):
         self.assertTrue(CASK_PATH.exists(), f"Cask file missing at {CASK_PATH}")
         content = CASK_PATH.read_text(encoding="utf-8")
         self.assertIn('cask "sony-open-pmca"', content)
-        self.assertIn('version "1.0.0"', content)
+        self.assertRegex(content, r'version\s+"\d+\.\d+\.\d+"')
         self.assertNotIn(":no_check", content, "Cask must not use :no_check")
         self.assertIn("depends_on arch: :arm64", content, "Cask must restrict to arm64")
         self.assertIn('app "Sony Open PMCA.app"', content)
@@ -183,13 +184,26 @@ class HomebrewCaskTest(unittest.TestCase):
         self.assertIsNotNone(match, "Cask must specify a valid 64-character SHA-256 checksum")
 
     def test_cask_checksum_matches_actual_mac_zip_if_present(self):
-        zip_file = REPO_ROOT / "dist" / "Sony-Open-PMCA-1.0.0-macos-arm64.zip"
+        content = CASK_PATH.read_text(encoding="utf-8")
+        version_match = re.search(r'version\s+"(\d+\.\d+\.\d+)"', content)
+        self.assertIsNotNone(version_match)
+        zip_file = REPO_ROOT / "dist" / f"Sony-Open-PMCA-{version_match.group(1)}-macos-arm64.zip"
         if zip_file.exists():
-            content = CASK_PATH.read_text(encoding="utf-8")
             match = re.search(r'sha256\s+"([0-9a-fA-F]{64})"', content)
             self.assertIsNotNone(match)
             actual_digest = hashlib.sha256(zip_file.read_bytes()).hexdigest()
             self.assertEqual(match.group(1).lower(), actual_digest.lower())
+
+    def test_checksum_validation_uses_the_version_declared_by_the_cask(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "dist").mkdir()
+            (root / "dist/Sony-Open-PMCA-1.1.0-macos-arm64.zip").write_bytes(b"release archive fixture")
+            cask = root / "sony-open-pmca.rb"
+            cask.write_text('version "1.1.0"\nsha256 "' + "0" * 64 + '"\n')
+            with patch(__name__ + ".REPO_ROOT", root), patch(__name__ + ".CASK_PATH", cask):
+                with self.assertRaises(AssertionError):
+                    self.test_cask_checksum_matches_actual_mac_zip_if_present()
 
     def test_cask_generator_produces_consistent_output(self):
         mod = load_build_module()

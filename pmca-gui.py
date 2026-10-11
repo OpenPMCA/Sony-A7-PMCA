@@ -12,6 +12,7 @@ import urllib.parse
 from urllib import request
 import webbrowser
 from datetime import datetime
+from queue import Empty
 from tkinter import font as tkfont
 from tkinter.filedialog import asksaveasfilename
 from tkinter.messagebox import askyesno, showerror
@@ -905,16 +906,39 @@ class MainUi(UiRoot):
   if hasattr(self, "statusVar"):
    self.statusVar.set("An operation is running…" if busy else "Camera not connected — connect camera in MTP mode." if not self.cameraActionsEnabled else "Idle.")
 
+ def _processQueue(self):
+  while True:
+   try:
+    func = self._queue.get(block=False)
+   except Empty:
+    break
+   try:
+    func()
+   except Exception:
+    traceback.print_exc()
+  if not getattr(self, "_closed", False):
+   self._queueAfterId = self.after(100, self._processQueue)
+
  def close(self):
   if self.cameraBusy:
    showerror("Operation in progress", "Wait for the current operation to finish before closing. If the camera is in use, keep it connected.")
    return
+  self.destroy()
+
+ def destroy(self):
+  self._closed = True
+  if getattr(self, "_queueAfterId", None):
+   try:
+    self.after_cancel(self._queueAfterId)
+   except Exception:
+    pass
+   self._queueAfterId = None
   if hasattr(self, "abortMonitor"):
    self.abortMonitor.set()
   abort = getattr(self, "abortSync", None)
   if abort is not None:
    abort.set()
-  self.destroy()
+  UiRoot.destroy(self)
 
  def log(self, msg, error=False):
   self.logBuffers[error] += msg

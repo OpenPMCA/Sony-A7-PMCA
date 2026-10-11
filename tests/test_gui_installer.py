@@ -44,6 +44,9 @@ class GuiInstallerTest(unittest.TestCase):
   })
   self.patches.__enter__()
   self.addCleanup(self.patches.__exit__, None, None, None)
+  self.mock_bg_sync = patch.object(self.gui['InstallerFrame'], 'startBackgroundSync', Mock())
+  self.mock_bg_sync.start()
+  self.addCleanup(self.mock_bg_sync.stop)
 
  def test_empty_apk_selection_does_not_start_installation(self):
   self.ui.getSelectedApk.return_value = ''
