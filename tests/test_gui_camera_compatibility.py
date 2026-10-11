@@ -634,12 +634,15 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   def succeeding_cb():
    executed.append('second')
 
+  previous_timer = root._queueAfterId
+  root.after_cancel(previous_timer)  # Emulate a scheduled tick before invoking its callback directly.
   mock_print_exc = Mock()
   with patch('traceback.print_exc', mock_print_exc):
    root.run(failing_cb)
    root.run(succeeding_cb)
    root._processQueue()
 
+  self.assertNotIn(previous_timer, root.tk.call('after', 'info'), 'Manual test dispatch must not leave a second queue timer')
   self.assertEqual(executed, ['first', 'second'], "Following callback must still run when previous callback raises")
   mock_print_exc.assert_called_once()
   self.assertIsNotNone(root._queueAfterId)

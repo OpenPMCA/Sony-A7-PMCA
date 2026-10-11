@@ -1,10 +1,10 @@
 # Sony Open PMCA release readiness
 
-## v1.1.0 release preparation (2026-10-11)
+## Published v1.1.0 release (2026-10-11)
 
 The user explicitly authorized GitHub release v1.1.0. The finalized camera-support correction adds model/protocol installation eligibility, body-identity cache and stale-callback isolation, and separate Tag9050a/b image-counter routing. The pre-version-bump correction passed 238 strict source tests without skips and a local 47-module frozen/source parity check; those results remain historical candidate evidence in `camera-support-validation.json`.
 
-v1.1.0 must pass fresh source tests and all three native CI jobs at the exact release source commit. Publish only their verified assets. The main Homebrew Cask is updated from the exact published CI ZIP after its checksum is known. Developer ID signing/notarization and broader physical camera/app verification are not completed and must remain explicit release limitations.
+v1.1.0 is published at [GitHub Releases](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.1.0), tagged at `bbbaea537e2a0e792cabcb90617cc9855bb2a8ed`. All three native CI jobs passed in [Run 38135433837](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38135433837); 246 local strict tests passed without skips or resource/Tk warnings. The published macOS ZIP requires macOS 14.0, passed encrypted runtime/signature/relocation and 47-module source parity, and has SHA-256 `395ec2bb352f863692b6322b9a52b93061eedcbea19877ff03c46da9552ecf3c`. The main Cask matches that exact archive. GUI header/footer show v1.1.0/Version 1.1.0. [Sanitized release evidence](release-validation-1.1.0.json) records binary checksums, runtime reports and limits. Developer ID signing/notarization and broader physical camera/app verification are not completed; the historical audit below is retained unchanged.
 
 ## Historical v1.0.0 local audit
 

@@ -1,7 +1,7 @@
 # Sony Open PMCA
 
 [![Native CI](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/OpenPMCA/Sony-Open-PMCA/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.1.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 
@@ -39,11 +39,11 @@ A/B are model-specific Sony MakerNote layouts, not camera firmware versions. Cou
 | Operating System | Package Format | Installation Method | Architecture |
 | :--- | :--- | :--- | :--- |
 | **macOS** (Homebrew) | Cask | `brew tap OpenPMCA/Sony-Open-PMCA https://github.com/OpenPMCA/Sony-Open-PMCA`<br>`brew install --cask sony-open-pmca` | Apple Silicon (`arm64`) |
-| **macOS** (Manual) | `.zip` (App bundle) | Download [`Sony-Open-PMCA-1.1.0-macos-arm64.zip`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases) → Extract to `/Applications` | Apple Silicon (`arm64`) |
-| **Windows** | Standalone `.exe` | Download [`Sony-Open-PMCA-1.1.0-windows-x64.exe`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases) → Run directly (no install required) | 64-bit Windows (`x64`) |
-| **Linux** | `.AppImage` | Download [`Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases)<br>`chmod +x Sony-Open-PMCA-*.AppImage && ./Sony-Open-PMCA-*.AppImage` | 64-bit Linux (`x86_64`) |
+| **macOS** (Manual) | `.zip` (App bundle) | Download [`Sony-Open-PMCA-1.1.0-macos-arm64.zip`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v1.1.0/Sony-Open-PMCA-1.1.0-macos-arm64.zip) → Extract to `/Applications` | Apple Silicon (`arm64`) |
+| **Windows** | Standalone `.exe` | Download [`Sony-Open-PMCA-1.1.0-windows-x64.exe`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v1.1.0/Sony-Open-PMCA-1.1.0-windows-x64.exe) → Run directly (no install required) | 64-bit Windows (`x64`) |
+| **Linux** | `.AppImage` | Download [`Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v1.1.0/Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage)<br>`chmod +x Sony-Open-PMCA-*.AppImage && ./Sony-Open-PMCA-*.AppImage` | 64-bit Linux (`x86_64`) |
 
-> ⚠️ Release binaries will be published under [GitHub Releases](https://github.com/OpenPMCA/Sony-Open-PMCA/releases). Until released, pre-built packages are generated as CI artifacts in [Actions](https://github.com/OpenPMCA/Sony-Open-PMCA/actions).
+> **v1.1.0 is published:** [Release notes, binaries and checksums](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.1.0). The Apple Silicon macOS package requires **macOS 14 Sonoma or newer** and is ad-hoc signed, not notarized.
 
 ---
 
@@ -69,7 +69,7 @@ A/B are model-specific Sony MakerNote layouts, not camera firmware versions. Cou
 | **Application Store** | 26 community apps with verified direct HTTPS download and model caveats | ✅ Ready |
 | **Smooth Mouse Scroll** | Instant 60px/notch wheel scrolling and 1:1 Apple Trackpad `<TouchpadScroll>` | ✅ Ready |
 | **Activity Logging** | Live search filter, level selector (All / Errors / Info), and raw error trace copying | ✅ Ready |
-| **Cross-Platform** | Native Windows, Linux and Apple Silicon builds; hardware USB checks remain model/platform-specific | CI builds passed for the linked revision |
+| **Cross-Platform** | Native Windows, Linux and Apple Silicon builds; hardware USB checks remain model/platform-specific | v1.1.0 native CI builds and final-runtime checks passed |
 
 ---
 
@@ -79,10 +79,10 @@ All builds and tests are continuously validated via GitHub Actions native runner
 
 | Test Target | Runner | Evidence & Results | Status |
 | :--- | :--- | :--- | :---: |
-| **macOS Native CI** | `macos-14` (Apple Silicon) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Unit tests, Tk smoke, PyInstaller, `--check-runtime` | ✅ **PASS** |
-| **Windows Native CI** | `windows-2022` (x64) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Unit tests, Tk smoke, one-file EXE, `--check-runtime` | ✅ **PASS** |
-| **Linux Native CI** | `ubuntu-22.04` (x86_64) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Xvfb tests, smoke, `appimagetool` packaging, AppImage verification | ✅ **PASS** |
-| **Unit Test Suite** | Current local correction candidate | 238 tests passed, no skips with 4 cached real APK fixtures ([Evidence](docs/camera-support-validation.json)); linked CI covers its earlier revision | ✅ **PASS** |
+| **macOS Native CI** | `macos-14` (Apple Silicon) | [Run 38135433837](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38135433837): Unit tests, Tk smoke, PyInstaller, `--check-runtime` | ✅ **PASS** |
+| **Windows Native CI** | `windows-2022` (x64) | [Run 38135433837](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38135433837): Unit tests, Tk smoke, one-file EXE, `--check-runtime` | ✅ **PASS** |
+| **Linux Native CI** | `ubuntu-22.04` (x86_64) | [Run 38135433837](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38135433837): Xvfb tests, smoke, `appimagetool` packaging, AppImage verification | ✅ **PASS** |
+| **Unit Test Suite** | v1.1.0 local source / native CI | 246 local tests passed, no skips with 4 cached APK fixtures; each native CI runner: 239 passed, 7 optional-fixture/reference skips ([Evidence](docs/release-validation-1.1.0.json)) | ✅ **PASS** |
 | **Store APK Validation** | Local download audit | 26/26 community APKs downloaded & validated ([Audit Evidence](docs/appstore-download-validation.json)) | ✅ **PASS** |
 | **Real Hardware** | Physical ILCE-7 | End-to-end RecipeLab 1.6.2 install verified with camera result code `0` | ✅ **PASS** |
 
