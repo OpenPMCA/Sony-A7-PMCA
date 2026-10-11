@@ -14,9 +14,6 @@ Built on the open-source reverse-engineering research of [Sony-PMCA-RE](https://
 ## Table of Contents
 
 - [Supported Cameras](#supported-cameras)
-  - [1. Tested (Hardware-Verified)](#1-tested-hardware-verified)
-  - [2. Supported (Should Work)](#2-supported-should-work)
-  - [3. Incompatible (Won't Work)](#3-incompatible-wont-work)
 - [Installation & Downloads](#installation--downloads)
 - [Quick Start](#quick-start)
 - [Features](#features)
@@ -28,39 +25,16 @@ Built on the open-source reverse-engineering research of [Sony-PMCA-RE](https://
 
 ## Supported Cameras
 
-Only Sony cameras with the built-in Android-based PlayMemories Camera Apps subsystem are capable of running PMCA apps.
+Only Sony cameras with the built-in Android-based PlayMemories Camera Apps subsystem can run PMCA apps:
 
-### 1. Tested (Hardware-Verified)
+| Series | Supported Camera Models | Model Codes | Shutter Counter |
+| :--- | :--- | :--- | :---: |
+| **Alpha Full-Frame** | α7, α7R, α7S, α7 II, α7R II, α7S II | `ILCE-7`, `7R`, `7S`, `7M2`, `7RM2`, `7SM2` | Tag 9050a / 9050b |
+| **Alpha APS-C** | α5000, α5100, α6000, α6300, α6500, QX1 | `ILCE-5000`, `5100`, `6000`, `6300`, `6500`, `QX1` | Tag 9050a / 9050b |
+| **NEX Series** | NEX-5R, NEX-5T, NEX-6 | `NEX-5R`, `NEX-5T`, `NEX-6` | — |
+| **Cyber-shot Series** | RX100 III/IV/V, RX10 II/III, RX1R II, HX60, HX90, HX400, WX500 | `DSC-RX100M3-M5`, `RX10M2-M3`, `RX1RM2`, `HX60`, `HX90`, `HX400`, `WX500` | — |
 
-These models have been physically tested and verified on real hardware in this project:
-
-| Model | Code | Status |
-| :--- | :--- | :--- |
-| **Sony α7** | `ILCE-7` | **Verified**: RecipeLab v1.6.2 installed on hardware with return code `0`. Tag 9050a shutter counter verified. |
-
-### 2. Supported (Should Work)
-
-These cameras feature the PMCA subsystem in the [upstream device reference](https://github.com/ma1co/fwtool.py/blob/cdba742b73eed5981480c326aeb30033aabf0223/devices.yml). They share the same MTP communication and app-installer protocol paths:
-
-| Model | Series | Counter Layout | Notes |
-| :--- | :--- | :---: | :--- |
-| **α7R**, **α7S**, **α7 II** | Alpha Full-Frame | Tag 9050a | `ILCE-7R`, `ILCE-7S`, `ILCE-7M2` |
-| **α7R II**, **α7S II** | Alpha Full-Frame | Tag 9050b | `ILCE-7RM2`, `ILCE-7SM2` (no flash rollover) |
-| **α5000**, **α5100**, **α6000**, **QX1** | Alpha APS-C | Tag 9050a | `ILCE-5000`, `ILCE-5100`, `ILCE-6000`, `ILCE-QX1` |
-| **α6300**, **α6500** | Alpha APS-C | Tag 9050b | `ILCE-6300`, `ILCE-6500` |
-| **NEX-5R**, **NEX-5T**, **NEX-6** | NEX Series | Unsupported | Wi-Fi / NFC app install supported |
-| **RX100 III**, **IV**, **V** | Cyber-shot RX | Unsupported | 1-inch sensor compacts |
-| **RX10 II**, **III**, **RX1R II** | Cyber-shot RX | Unsupported | Bridge and 35mm full-frame |
-| **HX60/V**, **HX90/V**, **HX400/V**, **WX500** | Cyber-shot HX/WX | Unsupported | Travel zoom compacts |
-
-> **Note on Shutter Count:** Shutter decoding reads metadata from an **existing photo** on the camera's SD card via MakerNote Tag 0x9050. No photo is automatically taken. Models marked "Unsupported" do not use Tag 0x9050. Unlisted models default to read-only diagnostics unless active installer mode is detected. See [camera support details](docs/camera-support.md).
-
-### 3. Incompatible (Won't Work)
-
-These cameras do **not** have the PMCA subsystem. The app detects them and allows read-only hardware inspection, but automatically disables installation controls to prevent errors:
-
-* **Modern Alpha (2017+)**: α7 III, α7 IV, α7C, α7C II, α7R III/IV/V, α7S III, α9 series, α1, α6100, α6400, α6600, α6700, ZV-1, ZV-E10, FX3, FX30.
-* **Earlier Non-PMCA Cameras**: NEX-3, NEX-5, NEX-5N, NEX-7, RX100 (Gen 1/2), RX1, RX1R, and A-mount SLT bodies (A77, A99, etc.).
+> **Incompatible cameras:** Models released from late 2017 onward (such as α7 III, α7 IV, α7C, α9, α1, α6400, α6700, ZV-1, ZV-E10, FX series) and older pre-PMCA cameras do not have the PMCA subsystem. Installation is automatically disabled for these cameras. Shutter counter decoding reads metadata from an existing photo on storage. See [camera support details](docs/camera-support.md).
 
 ---
 
