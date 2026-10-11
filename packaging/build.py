@@ -416,6 +416,7 @@ def package_linux_appimage(
 
     env = os.environ.copy()
     env["ARCH"] = "x86_64"
+    env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
     subprocess.check_call([str(tool_bin), str(appdir), str(out_path)], env=env)
 
     return {"appimage_path": out_path, "sha256": compute_sha256(out_path)}
@@ -446,7 +447,11 @@ def run_verify(executable_path: Path, expected_arch: str = None) -> int:
 
     cmd = [str(executable_path), "--check-runtime", str(report_file)]
     print(f"Executing runtime check: {' '.join(cmd)}")
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        print(f"Runtime check process timed out after 60s")
+        return 124
     if proc.returncode != 0:
         print(f"Runtime check process failed with status {proc.returncode}")
         print("stdout:", proc.stdout)

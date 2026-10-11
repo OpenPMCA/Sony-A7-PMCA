@@ -25,6 +25,6 @@ Verification date: 2026-10-11. Product version: 1.0.0. This report distinguishes
 
 Local validation references: `/tmp/pmca-coordinator-final-source-tests.log`, `/tmp/pmca-native-acceptance-zCWJmR/native-report.json`, `/tmp/pmca-native-acceptance-zCWJmR/touchpad-dispatch.json`, and `/tmp/pmca-native-acceptance-zCWJmR/text-geometry.json`. Temporary files can expire. The durable APK evidence and this report retain the relevant outcomes and limitations.
 
-Final local archive: `dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip`. SHA-256: `bb3a09234b97c480d39ed0a16b68646c1378c355e306cf71d18a340208074cb5`. Homebrew evaluation confirms ARM64 and macOS 27 or newer for this exact build. This does not publish the release URL.
+Final local archive: `dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip`. SHA-256: `5c06c399066dafdd6e566b3b258d02f1434e30d3f4934d4f27fd1bf43beec433`. Homebrew evaluation confirms ARM64 and macOS 27 or newer for this exact build. This does not publish the release URL.
 
 The actual final ZIP was also extracted into a fresh directory whose path contains spaces. The extracted application passed deep/strict signature verification and the complete frozen runtime diagnostic, including encrypted TLS, from that relocated path. The final post-package strict suite passed all 162 tests in `/tmp/pmca-coordinator-final-delivery-tests.log`.

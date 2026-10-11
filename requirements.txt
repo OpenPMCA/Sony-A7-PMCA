@@ -9,3 +9,4 @@ pyusb
 pywin32; sys_platform == 'win32'
 pyyaml
 tlslite-ng
+libusb-package==1.0.30.0; sys_platform == 'win32'

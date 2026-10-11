@@ -1915,7 +1915,14 @@ def checkRuntime(outFile):
  libusb_path = None
  try:
   import usb.backend.libusb1
-  library = usb.backend.libusb1._load_library()
+  find_lib = None
+  if sys.platform == 'win32':
+   try:
+    import libusb_package
+    find_lib = libusb_package.find_library
+   except ImportError:
+    pass
+  library = usb.backend.libusb1._load_library(find_library=find_lib) if find_lib else usb.backend.libusb1._load_library()
   if library:
    libusb_loads = bool(getattr(library, 'libusb_get_version', None))
    libusb_path = str(getattr(library, '_name', 'libusb'))

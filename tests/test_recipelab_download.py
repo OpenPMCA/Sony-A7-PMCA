@@ -40,11 +40,16 @@ class RecipeLabDownloadTest(unittest.TestCase):
  def setUp(self):
   self.assertIsNotNone(importlib.util.find_spec('pmca.appstore.recipelab'),
    'RecipeLab downloader is not implemented')
-  patcher = patch('urllib.request.OpenerDirector.open')
-  self.urlopen = patcher.start()
-  self.addCleanup(patcher.stop)
+  from unittest.mock import MagicMock
+  self.urlopen = MagicMock()
   from urllib import request
-  opener = patch('urllib.request.build_opener', wraps=request.build_opener)
+  real_build_opener = request.build_opener
+  def fake_build_opener(*handlers):
+   op = real_build_opener(*handlers)
+   op.open = self.urlopen
+   self.captured_handlers = handlers
+   return op
+  opener = patch('pmca.appstore.recipelab.request.build_opener', side_effect=fake_build_opener)
   self.opener = opener.start()
   self.addCleanup(opener.stop)
   self.download = importlib.import_module('pmca.appstore.recipelab').downloadRecipeLab
@@ -91,7 +96,7 @@ class RecipeLabDownloadTest(unittest.TestCase):
    self.assertNotIn('authorization', {key.lower() for key in call.args[0].headers})
    self.assertEqual(call.args[0].get_header('User-agent'), 'Sony-A7-PMCA')
    from urllib.request import HTTPSHandler
-   context = next(handler._context for handler in self.opener.call_args.args if isinstance(handler, HTTPSHandler))
+   context = next(handler._context for handler in self.captured_handlers if isinstance(handler, HTTPSHandler))
    self.assertIsInstance(context, ssl.SSLContext)
    self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
    self.assertTrue(context.check_hostname)

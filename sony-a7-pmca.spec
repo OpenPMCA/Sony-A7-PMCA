@@ -9,9 +9,16 @@ if sys.platform != 'darwin':
  raise RuntimeError('This app specification requires macOS')
 
 root = Path(SPECPATH)
-libusb = ctypes.util.find_library('usb-1.0')
-if not libusb:
+def find_libusb():
+ lib = ctypes.util.find_library('usb-1.0')
+ if lib and Path(lib).exists():
+  return str(Path(lib).resolve())
+ for candidate in ['/opt/homebrew/lib/libusb-1.0.dylib', '/usr/local/lib/libusb-1.0.dylib']:
+  if Path(candidate).exists():
+   return str(Path(candidate).resolve())
  raise RuntimeError('Install libusb before building: brew install libusb')
+
+libusb = find_libusb()
 
 from pmca import __version__ as version
 versionDir = root / 'build' / 'sony-a7-pmca-version'

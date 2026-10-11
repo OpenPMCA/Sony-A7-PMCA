@@ -1,6 +1,6 @@
 cask "sony-a7-pmca" do
   version "1.0.0"
-  sha256 "bb3a09234b97c480d39ed0a16b68646c1378c355e306cf71d18a340208074cb5"
+  sha256 "5c06c399066dafdd6e566b3b258d02f1434e30d3f4934d4f27fd1bf43beec433"
 
   url "https://github.com/OpenPMCA/Sony-A7-PMCA/releases/download/v#{version}/Sony-A7-PMCA-#{version}-macos-arm64.zip"
   name "Sony A7 PMCA"
