@@ -405,8 +405,10 @@ def package_linux_appimage(
     # Run appimagetool
     tool_bin = appimagetool_path
     if not tool_bin:
-        tool_bin = Path(shutil.which("appimagetool") or "")
-    if not tool_bin or not Path(tool_bin).exists():
+        found = shutil.which("appimagetool")
+        if found:
+            tool_bin = Path(found)
+    if not tool_bin or not Path(tool_bin).is_file():
         cache_dir = REPO_ROOT / "build" / "tools"
         cache_dir.mkdir(parents=True, exist_ok=True)
         tool_bin = download_and_verify_appimagetool(cache_dir / "appimagetool-x86_64.AppImage")
