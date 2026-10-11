@@ -1,3 +1,30 @@
-/build
-/dist
-*.pyc
+# Native builds and local Python environments
+/build/
+/dist/
+/.venv/
+/venv/
+/env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS metadata and local agent/session state
+.DS_Store
+.AppleDouble
+._*
+/.claude/
+/.remember/
+/docs/superpowers/
+
+# Downloaded APKs, archives and local diagnostics
+*.apk
+*.spk
+*.zip
+*.log
+*.part
+.env
+.env.*
+!.env.example

@@ -2,7 +2,10 @@ import contextlib
 import io
 import json
 import os
+import plistlib
+import subprocess
 import sys
+import threading
 import time
 import struct
 import zipfile
@@ -26,6 +29,52 @@ from ..util import http
 scriptRoot = getattr(sys, '_MEIPASS', os.path.dirname(__file__) + '/../..')
 
 
+class CameraBusyException(Exception):
+ """Raised when an exclusive camera operation is already in progress."""
+ pass
+
+
+_camera_lock = threading.RLock()
+_camera_busy = False
+_camera_busy_lock = threading.Lock()
+_last_verified_camera_status = None
+_status_cache_lock = threading.Lock()
+
+
+def get_last_verified_camera_status():
+ with _status_cache_lock:
+  return dict(_last_verified_camera_status) if _last_verified_camera_status else None
+
+
+def set_last_verified_camera_status(status):
+ global _last_verified_camera_status
+ with _status_cache_lock:
+  _last_verified_camera_status = dict(status) if status else None
+
+
+def is_camera_busy():
+ with _camera_busy_lock:
+  return _camera_busy
+
+
+def set_camera_busy(busy):
+ global _camera_busy
+ with _camera_busy_lock:
+  _camera_busy = bool(busy)
+
+
+@contextlib.contextmanager
+def camera_operation(blocking=True, timeout=None):
+ """Serialized camera operation context shared by info, install, probe."""
+ acquired = _camera_lock.acquire(blocking=blocking, timeout=-1 if timeout is None else timeout)
+ if not acquired:
+  raise CameraBusyException("Camera is busy with another operation")
+ try:
+  yield
+ finally:
+  _camera_lock.release()
+
+
 def printStatus(status):
  """Print progress"""
  print('%s %d%%' % (status.message, status.percent))
@@ -44,70 +93,493 @@ def listApps(enableCache=False):
  return appListCache
 
 
-def installApp(dev, apkFile=None, appPackage=None, outFile=None):
- """Installs an app on the specified device."""
- certFile = scriptRoot + '/certs/localtest.me.pem'
- with ServerContext(LocalMarketServer(certFile)) as server:
-  apkData = None
-  if apkFile:
-   apkData = apkFile.read()
-  elif appPackage:
-   print('Downloading apk')
-   apps = listApps(True)
-   if appPackage not in apps:
-    raise Exception('Unknown app: %s' % appPackage)
-   apkData = apps[appPackage].release.asset
-
-  if apkData:
-   print('Analyzing apk')
-   print('')
-   checkApk(io.BytesIO(apkData))
-   print('')
-   server.setApk(apkData)
-
-  print('Starting task')
-  xpdData = server.getXpd()
-
-  print('Starting communication')
-  # Point the camera to the web api
-  result = installer.install(SonyAppInstallCamera(dev), *server.server_address, xpdData, printStatus)
-  if result.code != 0:
-   raise Exception('Communication error %d: %s' % (result.code, result.message))
-
-  result = server.getResult()
-
-  print('Task completed successfully')
-
-  if outFile:
-   print('Writing to output file')
-   json.dump(result, outFile, indent=2)
-
-  return result
-
-
 def checkApk(apkFile):
+ """Analyzes and validates an APK file before transfer.
+ Strictly enforces non-empty package identifier, version, minSdkVersion (1..10), and signature certificate.
+ Returns the validated ApkParser instance or raises ValueError on validation error.
+ """
  try:
   apk = ApkParser(apkFile)
+ except Exception as e:
+  raise ValueError('Invalid APK file: %s' % e)
 
-  props = [
-   ('Package', apk.getPackageName()),
-   ('Version', apk.getVersionName()),
-  ]
+ package = apk.getPackageName()
+ if not package or not package.strip():
+  raise ValueError('The APK manifest has no package identifier.')
+
+ version = apk.getVersionName()
+ if not version or not str(version).strip():
+  raise ValueError('The APK manifest has no version identifier.')
+
+ props = [
+  ('Package', package),
+  ('Version', str(version)),
+ ]
+ try:
   apk.getVersionCode()
-  for k, v in props:
-   print('%-9s%s' % (k + ': ', v))
+ except Exception:
+  pass
 
-  sdk = apk.getMinSdkVersion()
-  if sdk > 10:
-   print('Warning: This app might not be compatible with the device (minSdkVersion = %d)' % sdk)
+ for k, v in props:
+  print('%-9s%s' % (k + ': ', v))
 
+ sdk = apk.getMinSdkVersion()
+ if not (1 <= sdk <= 10):
+  raise ValueError('Incompatible Android minSdkVersion: %s (camera requires API 1-10)' % sdk)
+
+ try:
+  cert = apk.getCert()
+  if not cert:
+   raise ValueError('APK signature certificate is empty')
+ except Exception as e:
+  raise ValueError('APK signature certificate missing or invalid: %s' % e)
+
+ return apk
+
+
+def installApp(dev, apkFile=None, appPackage=None, outFile=None, statusFunc=None):
+ """Installs an app on the specified device."""
+ with camera_operation(blocking=True):
+  set_camera_busy(True)
   try:
-   apk.getCert()
-  except:
-   print('Warning: Cannot read apk certificate')
+   certFile = scriptRoot + '/certs/localtest.me.pem'
+   with ServerContext(LocalMarketServer(certFile)) as server:
+    apkData = None
+    if apkFile:
+     apkData = apkFile.read() if hasattr(apkFile, 'read') else apkFile
+    elif appPackage:
+     print('Downloading apk')
+     apps = listApps(True)
+     if appPackage not in apps:
+      raise Exception('Unknown app: %s' % appPackage)
+     apkData = apps[appPackage].release.asset
 
- except:
-  print('Warning: Invalid apk file')
+    if apkData:
+     print('Analyzing apk')
+     print('')
+     checkApk(io.BytesIO(apkData))
+     print('')
+     server.setApk(apkData)
+
+    print('Starting task')
+    xpdData = server.getXpd()
+
+    print('Starting communication')
+    # Point the camera to the web api
+    result = installer.install(SonyAppInstallCamera(dev), *server.server_address, xpdData, statusFunc or printStatus)
+    if result.code != 0:
+     raise Exception('Communication error %d: %s' % (result.code, result.message))
+    try:
+     serverResult = server.getResult()
+    except Exception:
+     serverResult = None
+    if outFile and serverResult:
+     print('Saving camera response')
+     json.dump(serverResult, outFile, indent=2)
+    return serverResult if serverResult is not None else result
+  finally:
+   set_camera_busy(False)
+
+
+def getPassiveUsbDevice():
+ """Passive read-only query of macOS I/O registry for attached Sony camera without driver detachment."""
+ if sys.platform != 'darwin':
+  return None
+ try:
+  proc_dev = subprocess.run(['ioreg', '-r', '-c', 'IOUSBHostDevice', '-l', '-a'], capture_output=True, timeout=2)
+  if proc_dev.returncode != 0:
+   return None
+  dev_data = plistlib.loads(proc_dev.stdout)
+
+  sony_devices = []
+  def find_devs(node):
+   if isinstance(node, dict):
+    if node.get('idVendor') == SONY_ID_VENDOR:
+     sony_devices.append(node)
+    for v in node.values():
+     find_devs(v)
+   elif isinstance(node, list):
+    for item in node:
+     find_devs(item)
+  find_devs(dev_data)
+  if not sony_devices:
+   return None
+
+  proc_if = subprocess.run(['ioreg', '-r', '-c', 'IOUSBHostInterface', '-l', '-a'], capture_output=True, timeout=2)
+  ifaces = []
+  if proc_if.returncode == 0:
+   if_data = plistlib.loads(proc_if.stdout)
+   def find_ifs(node):
+    if isinstance(node, dict):
+     if 'bInterfaceClass' in node:
+      ifaces.append(node)
+     for v in node.values():
+      find_ifs(v)
+    elif isinstance(node, list):
+     for item in node:
+      find_ifs(item)
+   find_ifs(if_data)
+
+  dev = sony_devices[0]
+  name = dev.get('USB Product Name') or dev.get('kUSBProductString') or 'Sony Camera'
+  serial = dev.get('USB Serial Number') or dev.get('kUSBSerialNumberString')
+  pid = dev.get('idProduct')
+
+  mode = 'USB detected; mode not confirmed'
+  for iface in ifaces:
+   iface_name = iface.get('USB Product Name') or iface.get('kUSBProductString')
+   if iface_name == name or len(sony_devices) == 1:
+    cls = iface.get('bInterfaceClass')
+    subcls = iface.get('bInterfaceSubClass')
+    proto = iface.get('bInterfaceProtocol')
+    if cls == 6 and subcls == 1 and proto == 1:
+     mode = 'MTP / PTP (Class 6/1/1)'
+     break
+    elif cls == 8:
+     mode = 'Mass Storage (Class 8)'
+     break
+    elif cls == 255:
+     mode = 'Vendor Specific (Class 255)'
+     break
+
+  return {
+   'name': name,
+   'serial': serial,
+   'mode': mode,
+   'vendor': 'Sony (0x054c)',
+   'pid': pid,
+  }
+ except Exception:
+  return None
+
+
+def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
+ """Non-intrusive read-only query of camera connection status, capabilities, and failure classification."""
+ if driverName is None:
+  driverName = getDefaultDriverName()
+ if is_camera_busy():
+  last = get_last_verified_camera_status()
+  if last:
+   busy_status = dict(last)
+   busy_status['busy'] = True
+   busy_status['status'] = 'busy'
+   busy_status['mode'] = 'Busy'
+   busy_status['source_mode'] = last.get('source_mode') or last.get('mode') or 'Unknown'
+   busy_status['failure_reason'] = 'Camera operation in progress'
+   return busy_status
+
+  passive = getPassiveUsbDevice()
+  physical_detected = bool(passive)
+  return {
+   'connected': False,
+   'physicalDetected': physical_detected,
+   'appConnected': False,
+   'busy': True,
+   'status': 'busy',
+   'mode': 'Busy',
+   'name': passive.get('name') if passive else 'Camera Busy',
+   'model': passive.get('name') if passive else 'Camera Busy',
+   'manufacturer': 'Sony',
+   'vendor': 'Sony (0x054c)' if physical_detected else None,
+   'serial': passive.get('serial') if passive else None,
+   'firmware_version': None,
+   'capabilities': [],
+   'properties': [],
+   'events': [],
+   'formats': [],
+   'shutter_count': {'available': False, 'value': None, 'reason': 'Camera is busy with an active operation.'},
+   'failure_reason': 'Camera operation in progress',
+  }
+
+ passive = getPassiveUsbDevice()
+ physical_detected = bool(passive)
+
+ if not probe_communication:
+  if passive:
+   return {
+    'connected': False,
+    'physicalDetected': True,
+    'appConnected': False,
+    'busy': False,
+    'status': 'unverified',
+    'mode': passive.get('mode', 'Unknown'),
+    'name': passive.get('name', 'Sony Camera'),
+    'model': passive.get('name', 'Sony Camera'),
+    'manufacturer': 'Sony',
+    'vendor': passive.get('vendor', 'Sony (0x054c)'),
+    'serial': passive.get('serial'),
+    'firmware_version': None,
+    'capabilities': [],
+    'properties': [],
+    'events': [],
+    'formats': [],
+    'shutter_count': {'available': False, 'value': None, 'reason': 'Communication probe skipped.'},
+    'failure_reason': None,
+   }
+  return {
+   'connected': False,
+   'physicalDetected': False,
+   'appConnected': False,
+   'busy': False,
+   'status': 'disconnected',
+   'mode': 'Disconnected',
+   'name': None,
+   'model': None,
+   'manufacturer': 'Sony',
+   'vendor': None,
+   'serial': None,
+   'firmware_version': None,
+   'capabilities': [],
+   'properties': [],
+   'events': [],
+   'formats': [],
+   'shutter_count': {'available': False, 'value': None, 'reason': 'No camera detected.'},
+   'failure_reason': 'No camera detected on USB',
+  }
+
+ try:
+  with camera_operation(blocking=False):
+   with importDriver(driverName, quiet=quiet) as driver:
+    devices = list(driver.listDevices(SONY_ID_VENDOR))
+    if not devices:
+     if passive:
+      return {
+       'connected': False,
+       'physicalDetected': True,
+       'appConnected': False,
+       'busy': False,
+       'status': 'access_denied',
+       'mode': passive.get('mode', 'Access Denied'),
+       'name': passive.get('name', 'Sony Camera'),
+       'model': passive.get('name', 'Sony Camera'),
+       'manufacturer': 'Sony',
+       'vendor': 'Sony (0x054c)',
+       'serial': passive.get('serial'),
+       'firmware_version': None,
+       'capabilities': [],
+       'properties': [],
+       'events': [],
+       'formats': [],
+       'shutter_count': {'available': False, 'value': None, 'reason': 'Cannot access camera: interface unavailable.'},
+       'failure_reason': 'USB interface cannot be opened (managed by macOS ptpcamerad or permission needed)',
+      }
+     return {
+      'connected': False,
+      'physicalDetected': False,
+      'appConnected': False,
+      'busy': False,
+      'status': 'disconnected',
+      'mode': 'Disconnected',
+      'name': None,
+      'model': None,
+      'manufacturer': 'Sony',
+      'vendor': None,
+      'serial': None,
+      'firmware_version': None,
+      'capabilities': [],
+      'properties': [],
+      'events': [],
+      'formats': [],
+      'shutter_count': {'available': False, 'value': None, 'reason': 'No camera connected.'},
+      'failure_reason': 'No camera detected on USB',
+     }
+
+    dev, dev_type, drv = devices[0]
+    if dev_type == USB_CLASS_PTP:
+     mtp = MtpDevice(drv)
+     try:
+      info = mtp.getDeviceInfo()
+     finally:
+      try:
+       mtp.closeSession()
+      except Exception:
+       pass
+
+     mode = 'App installation' if isSonyMtpAppInstallCamera(info) else 'MTP' if isSonyMtpCamera(info) else 'PTP'
+     ptp_ver = getattr(info, 'version', None)
+     last = get_last_verified_camera_status()
+     prior_fw = last.get('firmware_version') if last else None
+     if prior_fw and not prior_fw.startswith('Unavailable') and prior_fw != ptp_ver:
+      fw_ver = prior_fw
+     else:
+      fw_ver = 'Unavailable without firmware query'
+
+     # Use verified vendor body serial if known, else raw serial
+     body_serial = last.get('serial') if (last and last.get('serial') and not str(last['serial']).startswith('0000000000000000')) else (info.serialNumber[-8:] if (info.serialNumber and len(info.serialNumber) == 32 and info.serialNumber.startswith('0000000000000000')) else info.serialNumber)
+     shutter_data = last.get('shutter_count') if last else None
+     if not shutter_data:
+      if isSonyMtpAppInstallCamera(info):
+       shutter_data = {
+        'available': False,
+        'value': None,
+        'reason': 'Camera is in App installation mode. Switch back to normal MTP mode to read shutter count.',
+       }
+      else:
+       shutter_data = {
+        'available': False,
+        'value': None,
+        'reason': 'Query camera info to inspect shutter count.',
+       }
+
+     res = {
+      'connected': True,
+      'physicalDetected': True,
+      'appConnected': True,
+      'busy': False,
+      'status': 'ready',
+      'mode': mode,
+      'source_mode': mode,
+      'name': info.model,
+      'model': info.model,
+      'manufacturer': info.manufacturer,
+      'vendor': 'Sony (0x054c)',
+      'serial': body_serial,
+      'raw_serial': info.serialNumber,
+      'ptp_device_version': ptp_ver,
+      'firmware_version': fw_ver,
+      'capabilities': list(info.operationsSupported) if hasattr(info, 'operationsSupported') else [],
+      'properties': list(getattr(info, 'devicePropertiesSupported', [])) if hasattr(info, 'devicePropertiesSupported') else [],
+      'events': list(getattr(info, 'eventsSupported', [])) if hasattr(info, 'eventsSupported') else [],
+      'formats': list(getattr(info, 'captureFormats', [])) if hasattr(info, 'captureFormats') else [],
+      'shutter_count': shutter_data,
+      'failure_reason': None,
+     }
+     set_last_verified_camera_status(res)
+     return res
+
+    elif dev_type == USB_CLASS_MSC:
+     msc = MscDevice(drv)
+     info = msc.getDeviceInfo()
+     return {
+      'connected': True,
+      'physicalDetected': True,
+      'appConnected': True,
+      'busy': False,
+      'status': 'ready',
+      'mode': 'Mass Storage',
+      'source_mode': 'Mass Storage',
+      'name': info.model,
+      'model': info.model,
+      'manufacturer': info.manufacturer,
+      'vendor': 'Sony (0x054c)',
+      'serial': passive.get('serial') if passive else None,
+      'firmware_version': None,
+      'capabilities': [],
+      'properties': [],
+      'events': [],
+      'formats': [],
+      'shutter_count': {
+       'available': False,
+       'value': None,
+       'reason': 'Mass storage mode does not expose shutter actuation counter.',
+      },
+      'failure_reason': None,
+     }
+
+    else:
+     return {
+      'connected': False,
+      'physicalDetected': True,
+      'appConnected': False,
+      'busy': False,
+      'status': 'unsupported',
+      'mode': 'Unknown (%d)' % dev_type,
+      'name': passive.get('name') if passive else 'Sony Device',
+      'model': passive.get('name') if passive else 'Sony Device',
+      'manufacturer': 'Sony',
+      'vendor': 'Sony (0x054c)',
+      'serial': passive.get('serial') if passive else None,
+      'firmware_version': None,
+      'capabilities': [],
+      'properties': [],
+      'events': [],
+      'formats': [],
+      'shutter_count': {'available': False, 'value': None, 'reason': 'Unsupported USB mode.'},
+      'failure_reason': 'Unsupported USB device class %d' % dev_type,
+     }
+
+ except CameraBusyException:
+  return {
+   'connected': True,
+   'physicalDetected': True,
+   'appConnected': True,
+   'busy': True,
+   'status': 'busy',
+   'mode': 'Busy',
+   'name': 'Camera Busy',
+   'model': 'Camera Busy',
+   'manufacturer': 'Sony',
+   'vendor': 'Sony (0x054c)',
+   'serial': None,
+   'firmware_version': None,
+   'capabilities': [],
+   'properties': [],
+   'events': [],
+   'formats': [],
+   'shutter_count': {'available': False, 'value': None, 'reason': 'Camera is busy with an active transfer.'},
+   'failure_reason': 'Camera operation in progress',
+  }
+ except PermissionError as e:
+  return {
+   'connected': False,
+   'physicalDetected': True,
+   'appConnected': False,
+   'busy': False,
+   'status': 'access_denied',
+   'mode': passive.get('mode', 'Access Denied') if passive else 'Access Denied',
+   'name': passive.get('name', 'Sony Camera') if passive else 'Sony Camera',
+   'model': passive.get('name', 'Sony Camera') if passive else 'Sony Camera',
+   'manufacturer': 'Sony',
+   'vendor': 'Sony (0x054c)',
+   'serial': passive.get('serial') if passive else None,
+   'firmware_version': None,
+   'capabilities': [],
+   'properties': [],
+   'events': [],
+   'formats': [],
+   'shutter_count': {'available': False, 'value': None, 'reason': 'Camera communication denied by OS.'},
+   'failure_reason': 'Camera access denied: %s' % str(e),
+  }
+ except Exception as e:
+  err_str = str(e).lower()
+  is_access = 'access' in err_str or 'permission' in err_str or getattr(e, 'backend_error_code', None) == -3
+  return {
+   'connected': False,
+   'physicalDetected': physical_detected,
+   'appConnected': False,
+   'busy': False,
+   'status': 'access_denied' if is_access else ('unsupported' if physical_detected else 'disconnected'),
+   'mode': passive.get('mode', 'Error') if passive else 'Disconnected',
+   'name': passive.get('name') if passive else None,
+   'model': passive.get('name') if passive else None,
+   'manufacturer': 'Sony',
+   'vendor': 'Sony (0x054c)' if physical_detected else None,
+   'serial': passive.get('serial') if passive else None,
+   'firmware_version': None,
+   'capabilities': [],
+   'properties': [],
+   'events': [],
+   'formats': [],
+   'shutter_count': {'available': False, 'value': None, 'reason': 'Cannot query camera.'},
+   'failure_reason': str(e),
+  }
+
+
+def getDefaultDriverName():
+ """Returns platform-specific default USB driver: Windows native WPD, Linux libusb, macOS libusb-mtp."""
+ if sys.platform == 'win32':
+  return None
+ elif sys.platform == 'darwin':
+  return 'libusb-mtp'
+ else:
+  return 'libusb'
+
+
+# Alias for GUI compatibility
+def checkCameraConnection(driverName=None, quiet=False):
+ if driverName is None:
+  driverName = getDefaultDriverName()
+ return getCameraStatus(driverName=driverName, quiet=quiet)
 
 
 class UsbDriverList(contextlib.AbstractContextManager):
@@ -130,8 +602,8 @@ class UsbDriverList(contextlib.AbstractContextManager):
     yield dev, driver.classType, driver.openDevice(dev)
 
 
-def importDriver(driverName=None):
- """Imports the usb driver. Use in a with statement"""
+def importDriver(driverName=None, quiet=False):
+ """Returns an UsbDriverList containing all available drivers"""
  MscContext = None
  MtpContext = None
  VendorSpecificContext = None
@@ -150,25 +622,26 @@ def importDriver(driverName=None):
    if isMscDriverAvailable():
     from ..usb.driver.osx import MscContext
    else:
-    print('Native driver not installed')
+    print('Native mass storage driver unavailable; using libusb')
   else:
    print('No native drivers available')
  elif driverName == 'qemu':
   from ..usb.driver.generic.qemu import MscContext
   from ..usb.driver.generic.qemu import MtpContext
- elif driverName != 'libusb':
+ elif driverName not in ('libusb', 'libusb-mtp'):
   raise Exception('Unknown driver')
 
  # Fallback to libusb
- if MscContext is None or (driverName is None and sys.platform == 'win32'):
+ if driverName != 'libusb-mtp' and (MscContext is None or (driverName is None and sys.platform == 'win32')):
   from ..usb.driver.generic.libusb import MscContext as MscContext2
  if MtpContext is None or (driverName is None and sys.platform == 'win32'):
   from ..usb.driver.generic.libusb import MtpContext as MtpContext2
- if (VendorSpecificContext is None and driverName != 'qemu') or (driverName is None and sys.platform == 'win32'):
+ if driverName != 'libusb-mtp' and ((VendorSpecificContext is None and driverName != 'qemu') or (driverName is None and sys.platform == 'win32')):
   from ..usb.driver.generic.libusb import VendorSpecificContext as VendorSpecificContext2
 
  drivers = [context() for context in [MscContext, MtpContext, VendorSpecificContext, MscContext2, MtpContext2, VendorSpecificContext2] if context]
- print('Using drivers %s' % ', '.join(d.name for d in drivers))
+ if not quiet:
+  print('Using drivers %s' % ', '.join(d.name for d in drivers))
  return UsbDriverList(*drivers)
 
 
@@ -230,78 +703,221 @@ def getDevice(driver):
 
 def infoCommand(driverName=None):
  """Display information about the camera connected via usb"""
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
+ with camera_operation(blocking=True):
+  with importDriver(driverName) as driver:
+   device = getDevice(driver)
+   if device:
+    if isinstance(device, SonyAppInstallDevice):
+     info = installApp(device)
+     print('')
+     props = [
+      ('Model', info['deviceinfo']['name']),
+      ('Product code', info['deviceinfo']['productcode']),
+      ('Serial number', info['deviceinfo']['deviceid']),
+      ('Firmware version', info['deviceinfo']['fwversion']),
+     ]
+    elif isinstance(device, SonyExtCmdDevice):
+     dev = SonyExtCmdCamera(device)
+     info = dev.getCameraInfo()
+     firmwareOld = None
+     try:
+      # Ephemeral updater version query (CMD_QUERY_VERSION without CMD_SWITCH_MODE)
+      updater = SonyUpdaterCamera(device)
+      updater.init()
+      firmwareOld, firmwareNew = updater.getFirmwareVersion()
+      try:
+       updater.complete()
+      except Exception:
+       pass
+     except Exception:
+      last = get_last_verified_camera_status()
+      if last and last.get('firmware_version') and not last['firmware_version'].startswith('Unavailable'):
+       firmwareOld = last['firmware_version']
+      else:
+       try:
+        mtp_info = device.getDeviceInfo()
+        ptp_v = getattr(mtp_info, 'version', None)
+        firmwareOld = 'PTP %s (firmware query unavailable)' % ptp_v if ptp_v else 'Unknown'
+       except Exception:
+        firmwareOld = getattr(device, 'version', None) or 'Unknown'
+
+     # Cache verified firmware version for non-intrusive status heartbeats
+     if firmwareOld and not firmwareOld.startswith('PTP') and not firmwareOld.startswith('Unavailable') and firmwareOld != 'Unknown':
+      last = get_last_verified_camera_status()
+      if last:
+       last['firmware_version'] = firmwareOld
+       set_last_verified_camera_status(last)
+     props = [
+      ('Model', info.modelName),
+      ('Product code', info.modelCode),
+      ('Serial number', info.serial),
+      ('Firmware version', firmwareOld),
+     ]
+     try:
+      lensInfo = dev.getLensInfo()
+      if lensInfo.model != 0:
+       props.append(('Lens', 'Model 0x%x (Firmware %s)' % (lensInfo.model, lensInfo.version)))
+     except (InvalidCommandException, UnknownMscException):
+      pass
+     try:
+      gpsInfo = dev.getGpsData()
+      props.append(('GPS Data', '%s - %s' % gpsInfo))
+     except (InvalidCommandException, UnknownMscException):
+      pass
+    else:
+     print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')
+     return
+    mode = 'App installation' if isinstance(device, SonyAppInstallDevice) else 'MTP' if isinstance(device, SonyMtpExtCmdDevice) else 'Mass Storage'
+    props.insert(1, ('USB mode', mode))
+    for k, v in props:
+     print('%-20s%s' % (k + ': ', v))
+    return dict(props)
+
+
+def getReadOnlyCameraInfo(driverName=None):
+ """Safe, non-intrusive read-only query of camera model, product code, serial, firmware, and lens.
+ Never calls updater.init() or triggers camera mode changes.
+ """
+ if driverName is None:
+  driverName = getDefaultDriverName()
+ with camera_operation(blocking=True):
+  with importDriver(driverName) as driver:
+   device = getDevice(driver)
+   if not device:
+    return None
    if isinstance(device, SonyAppInstallDevice):
-    info = installApp(device)
-    print('')
-    props = [
-     ('Model', info['deviceinfo']['name']),
-     ('Product code', info['deviceinfo']['productcode']),
-     ('Serial number', info['deviceinfo']['deviceid']),
-     ('Firmware version', info['deviceinfo']['fwversion']),
-    ]
+    return getCameraStatus(driverName=driverName)
    elif isinstance(device, SonyExtCmdDevice):
     dev = SonyExtCmdCamera(device)
     info = dev.getCameraInfo()
-    updater = SonyUpdaterCamera(device)
-    updater.init()
-    firmwareOld, firmwareNew = updater.getFirmwareVersion()
-    props = [
-     ('Model', info.modelName),
-     ('Product code', info.modelCode),
-     ('Serial number', info.serial),
-     ('Firmware version', firmwareOld),
-    ]
+    firmware_version = 'Unknown'
+    ptp_version = None
+    if isinstance(device, SonyMtpExtCmdDevice):
+     try:
+      mtp_info = device.getDeviceInfo()
+      ptp_version = getattr(mtp_info, 'version', None)
+     except Exception:
+      pass
+
+    # Read verified firmware if cached, or from plist
+    try:
+     plist_dict = plistlib.loads(info.plist)
+     firmware_version = plist_dict.get('FirmwareVersion') or plist_dict.get('version')
+    except Exception:
+     pass
+    if not firmware_version:
+     last = get_last_verified_camera_status()
+     if last and last.get('firmware_version') and not last['firmware_version'].startswith('Unavailable') and last['firmware_version'] != ptp_version:
+      firmware_version = last['firmware_version']
+     else:
+      firmware_version = 'Unavailable (read-only MTP)'
+
+    props = {
+     'Model': info.modelName,
+     'Product code': info.modelCode,
+     'Serial number': info.serial,
+     'PTP version': ptp_version or 'N/A',
+     'Firmware version': firmware_version,
+     'USB mode': 'MTP' if isinstance(device, SonyMtpExtCmdDevice) else 'Mass Storage',
+    }
     try:
      lensInfo = dev.getLensInfo()
      if lensInfo.model != 0:
-      props.append(('Lens', 'Model 0x%x (Firmware %s)' % (lensInfo.model, lensInfo.version)))
-    except (InvalidCommandException, UnknownMscException):
+      props['Lens'] = 'Model 0x%x (Firmware %s)' % (lensInfo.model, lensInfo.version)
+    except Exception:
      pass
     try:
      gpsInfo = dev.getGpsData()
-     props.append(('GPS Data', '%s - %s' % gpsInfo))
-    except (InvalidCommandException, UnknownMscException):
+     props['GPS Data'] = '%s - %s' % gpsInfo
+    except Exception:
      pass
-   else:
-    print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')
-    return
-   for k, v in props:
-    print('%-20s%s' % (k + ': ', v))
+
+    # Query genuine shutter count over MTP if in MTP mode
+    sc_data = None
+    if isinstance(device, SonyMtpExtCmdDevice):
+     try:
+      from ..util.shutter import query_mtp_camera_shutter_count
+      sc_data = query_mtp_camera_shutter_count(device)
+      if sc_data:
+       if sc_data.get('available') and sc_data.get('value') is not None:
+        props['Shutter count'] = '{:,} actuations'.format(sc_data['value'])
+        if sc_data.get('provenance'):
+         props['Shutter note'] = sc_data['provenance']
+       elif sc_data.get('ambiguous') and sc_data.get('shutter_count_modulo') is not None:
+        props['Shutter count'] = '{:,} actuations (modulo 65,536)'.format(sc_data['shutter_count_modulo'])
+        props['Shutter note'] = sc_data.get('warning') or 'Captured with flash; 16-bit counter'
+       elif sc_data.get('reason'):
+        props['Shutter count'] = 'Unavailable'
+        props['Shutter note'] = sc_data['reason']
+     except Exception:
+      pass
+
+    # Update cache with verified identity, serial, and shutter data
+    last = get_last_verified_camera_status()
+    if last:
+     last['serial'] = info.serial
+     if firmware_version != 'Unavailable (read-only MTP)':
+      last['firmware_version'] = firmware_version
+     if sc_data:
+      last['shutter_count'] = sc_data
+     set_last_verified_camera_status(last)
+
+    return props
+   return None
 
 
-def installCommand(driverName=None, apkFile=None, appPackage=None, outFile=None):
+def installCommand(driverName=None, apkFile=None, appPackage=None, outFile=None, statusFunc=None):
  """Install the given apk on the camera"""
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device and isinstance(device, SonyExtCmdDevice):
-   print('Switching to app install mode')
-   try:
-    SonyExtCmdCamera(device).switchToAppInstaller()
-   except InvalidCommandException:
-    print('Error: This camera does not support apps. Please check the compatibility list.')
-    return
-   device = None
+ with camera_operation(blocking=True):
+  set_camera_busy(True)
+  try:
+   # Preflight immutable APK before ANY camera mode switch or transfer side effects
+   apkData = None
+   if apkFile:
+    apkData = apkFile.read() if hasattr(apkFile, 'read') else apkFile
+   elif appPackage:
+    print('Downloading apk')
+    apps = listApps(True)
+    if appPackage not in apps:
+     raise Exception('Unknown app: %s' % appPackage)
+    apkData = apps[appPackage].release.asset
 
-   print('Waiting for camera to switch...')
-   for i in range(10):
-    time.sleep(.5)
-    try:
-     devices = list(listDevices(driver, True))
-     if len(devices) == 1 and isinstance(devices[0], SonyAppInstallDevice):
-      device = devices[0]
-      break
-    except:
-     pass
-   else:
-    print('Operation timed out. Please run this command again when your camera has connected.')
+   if apkData:
+    print('Analyzing apk')
+    print('')
+    checkApk(io.BytesIO(apkData))
+    print('')
 
-  if device and isinstance(device, SonyAppInstallDevice):
-   installApp(device, apkFile, appPackage, outFile)
-  elif device:
-   print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')
+   with importDriver(driverName) as driver:
+    device = getDevice(driver)
+    if device and isinstance(device, SonyExtCmdDevice):
+     print('Switching to app install mode')
+     try:
+      SonyExtCmdCamera(device).switchToAppInstaller()
+     except InvalidCommandException:
+      print('Error: This camera does not support apps. Please check the compatibility list.')
+      return
+     device = None
+
+     print('Waiting for camera to switch...')
+     for i in range(20):
+      time.sleep(.5)
+      try:
+       devices = list(listDevices(driver, True))
+       if len(devices) == 1 and isinstance(devices[0], SonyAppInstallDevice):
+        device = devices[0]
+        break
+      except:
+       pass
+     else:
+      print('Operation timed out. Please run this command again when your camera has connected.')
+
+    if device and isinstance(device, SonyAppInstallDevice):
+     return installApp(device, apkFile=io.BytesIO(apkData) if apkData else None, appPackage=None if apkData else appPackage, outFile=outFile, statusFunc=statusFunc)
+    elif device:
+     print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')
+  finally:
+   set_camera_busy(False)
 
 
 def appSelectionCommand():
@@ -314,397 +930,3 @@ def appSelectionCommand():
   print('')
   print('Installing %s' % pkg)
   return pkg
-
-
-def getFdats():
- fdatDir = scriptRoot + '/updatershell/fdat/'
- for dir in os.listdir(fdatDir):
-  if os.path.isdir(fdatDir + dir):
-   payloadFile = fdatDir + dir + '.dat'
-   if os.path.isfile(payloadFile):
-    for model in os.listdir(fdatDir + dir):
-     hdrFile = fdatDir + dir + '/' + model
-     if os.path.isfile(hdrFile) and hdrFile.endswith('.hdr'):
-      yield model[:-4], (hdrFile, payloadFile)
-
-
-def getFdat(device):
- fdats = dict(getFdats())
- while device != '' and not device[-1:].isdigit() and device not in fdats:
-  device = device[:-1]
- if device in fdats:
-  hdrFile, payloadFile = fdats[device]
-  with open(hdrFile, 'rb') as hdr, open(payloadFile, 'rb') as payload:
-   return hdr.read() + payload.read()
-
-
-def firmwareUpdateCommand(file, driverName=None):
- offset, size = firmware.readDat(file)
-
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   firmwareUpdateCommandInternal(driver, device, file, offset, size)
-
-
-def updaterShellCommand(model=None, fdatFile=None, driverName=None, complete=None):
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   if fdatFile:
-    fdat = fdatFile.read()
-   else:
-    if not model:
-     print('Getting device info')
-     try:
-      model = SonyExtCmdCamera(device).getCameraInfo().modelName
-     except:
-      print('Error: Cannot determine camera model')
-      return
-     print('Using firmware for model %s' % model)
-     print('')
-
-    fdat = getFdat(model)
-    if not fdat:
-     print('Error: Model "%s" does not support custom firmware updates. Please check the compatibility list.' % model)
-     return
-
-   if not complete:
-    def complete(device):
-     print('Starting updater shell...')
-     print('')
-     CameraShell(UsbPlatformBackend(device)).run()
-   firmwareUpdateCommandInternal(driver, device, io.BytesIO(fdat), 0, len(fdat), complete)
-
-
-def firmwareUpdateCommandInternal(driver, device, file, offset, size, complete=None):
- if not isinstance(device, SonyUpdaterDevice) and not isinstance(device, SonyExtCmdDevice):
-  print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')
-  return
-
- dev = SonyUpdaterCamera(device)
-
- print('Initializing firmware update')
- dev.init()
- file.seek(offset)
- dev.checkGuard(file, size)
- versions = dev.getFirmwareVersion()
- if versions[1] != '9.99':
-  print('Updating from version %s to version %s' % versions)
-
- if not isinstance(device, SonyUpdaterDevice):
-  print('Switching to updater mode')
-  dev.switchMode()
-
-  device = None
-  print('')
-  print('Waiting for camera to switch...')
-  print('Please follow the instructions on the camera screen.')
-  for i in range(60):
-   time.sleep(.5)
-   try:
-    devices = list(listDevices(driver, True))
-    if len(devices) == 1 and isinstance(devices[0], SonyUpdaterDevice):
-     device = devices[0]
-     break
-   except:
-    pass
-  else:
-   print('Operation timed out. Please run this command again when your camera has connected.')
-
-  if device:
-   firmwareUpdateCommandInternal(None, device, file, offset, size, complete)
-
- else:
-  print('Writing firmware')
-  file.seek(offset)
-  dev.writeFirmware(ProgressFile(file, size), size, complete)
-  dev.complete()
-  print('Done')
-
-
-def guessFirmwareCommand(file, driverName=None):
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   if not isinstance(device, SonyExtCmdDevice):
-    print('Error: Cannot use camera in this mode.')
-    return
-
-   print('Getting device info')
-   model = SonyExtCmdCamera(device).getCameraInfo().modelName
-   print('Model name: %s' % model)
-   print('')
-
-   dev = SonyUpdaterCamera(device)
-   with zipfile.ZipFile(file) as zip:
-    infos = zip.infolist()
-    print('Trying %d firmware images' % len(infos))
-    for info in infos:
-     data = zip.read(info)
-     try:
-      dev.init()
-      dev.checkGuard(io.BytesIO(data), len(data))
-      break
-     except Exception as e:
-      if 'Invalid model' not in str(e):
-       print(e)
-       break
-    else:
-     print('Fail: No matching file found')
-     return
-    print('Success: Found matching file: %s' % info.filename)
-
-
-def gpsUpdateCommand(file=None, driverName=None):
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   if not isinstance(device, SonyExtCmdDevice):
-    print('Error: Cannot use camera in this mode.')
-    return
-
-   if not file:
-    print('Downloading GPS data')
-    file = io.BytesIO(http.get('https://control.d-imaging.sony.co.jp/GPS/assistme.dat').raw_data)
-
-   print('Writing GPS data')
-   SonyExtCmdCamera(device).writeGpsData(file)
-   print('Done')
-
-
-def streamingCommand(write=None, file=None, driverName=None):
- """Read/Write Streaming information for the camera connected via usb"""
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   if not isinstance(device, SonyExtCmdDevice):
-    print('Error: Cannot use camera in this mode.')
-   else:
-    dev = SonyExtCmdCamera(device)
-
-    if write:
-     incoming = json.load(write)
-
-     # assemble Social (first 9 items in file)
-     mydict = {}
-     for key in incoming[:9]:
-      if key[0] in ['twitterEnabled', 'facebookEnabled']:
-       mydict[key[0]] = key[1] # Integer
-      else:
-       mydict[key[0]] = key[1].encode('ascii')
-
-     data = SonyExtCmdCamera.LiveStreamingSNSInfo.pack(
-      twitterEnabled = mydict['twitterEnabled'],
-      twitterConsumerKey = mydict['twitterConsumerKey'].ljust(1025, b'\x00'),
-      twitterConsumerSecret = mydict['twitterConsumerSecret'].ljust(1025, b'\x00'),
-      twitterAccessToken1 = mydict['twitterAccessToken1'].ljust(1025, b'\x00'),
-      twitterAccessTokenSecret = mydict['twitterAccessTokenSecret'].ljust(1025, b'\x00'),
-      twitterMessage = mydict['twitterMessage'].ljust(401, b'\x00'),
-      facebookEnabled = mydict['facebookEnabled'],
-      facebookAccessToken = mydict['facebookAccessToken'].ljust(1025, b'\x00'),
-      facebookMessage = mydict['facebookMessage'].ljust(401, b'\x00'),
-     )
-     dev.setLiveStreamingSocialInfo(data)
-
-     # assemble Streaming, file may contain multiple sets (of 14 items)
-     data = b'\x01\x00\x00\x00'
-     data += struct.pack('<i', int((len(incoming)-9)/14))
-     mydict = {}
-     count = 1
-     for key in incoming[9:]:
-      if key[0] in ['service', 'enabled', 'videoFormat', 'videoFormat', 'unknown', \
-        'enableRecordMode', 'channels', 'supportedFormats']:
-       mydict[key[0]] = key[1]
-      elif key[0] == 'macIssueTime':
-       mydict[key[0]] = binascii.a2b_hex(key[1])
-      else:
-       mydict[key[0]] = key[1].encode('ascii')
-
-      if count == 14:
-       # reassemble Structs
-       data += SonyExtCmdCamera.LiveStreamingServiceInfo1.pack(
-        service = mydict['service'],
-        enabled = mydict['enabled'],
-        macId = mydict['macId'].ljust(41, b'\x00'),
-        macSecret = mydict['macSecret'].ljust(41, b'\x00'),
-        macIssueTime = mydict['macIssueTime'],
-        unknown = 0, # mydict['unknown'],
-       )
-
-       data += struct.pack('<i', len(mydict['channels']))
-       for j in range(len(mydict['channels'])):
-        data += struct.pack('<i', mydict['channels'][j])
-
-       data += SonyExtCmdCamera.LiveStreamingServiceInfo2.pack(
-        shortURL = mydict['shortURL'].ljust(101, b'\x00'),
-        videoFormat = mydict['videoFormat'],
-       )
-
-       data += struct.pack('<i', len(mydict['supportedFormats']))
-       for j in range(len(mydict['supportedFormats'])):
-        data += struct.pack('<i', mydict['supportedFormats'][j])
-
-       data += SonyExtCmdCamera.LiveStreamingServiceInfo3.pack(
-        enableRecordMode = mydict['enableRecordMode'],
-        videoTitle = mydict['videoTitle'].ljust(401, b'\x00'),
-        videoDescription = mydict['videoDescription'].ljust(401, b'\x00'),
-        videoTag = mydict['videoTag'].ljust(401, b'\x00'),
-       )
-       count = 1
-      else:
-       count += 1
-
-     dev.setLiveStreamingServiceInfo(data)
-     return
-
-    # Read settings from camera (do this first so we know channels/supportedFormats)
-    settings = dev.getLiveStreamingServiceInfo()
-    social = dev.getLiveStreamingSocialInfo()
-
-    data = []
-    # Social settings
-    for key in (social._asdict()).items():
-     if key[0] in ['twitterEnabled', 'facebookEnabled']:
-      data.append([key[0], key[1]])
-     else:
-      data.append([key[0], key[1].decode('ascii').split('\x00')[0]])
-
-    # Streaming settings, file may contain muliple sets of data
-    try:
-     for key in next(settings).items():
-      if key[0] in ['service', 'enabled', 'videoFormat', 'enableRecordMode', \
-        'unknown', 'channels', 'supportedFormats']:
-       data.append([key[0], key[1]])
-      elif key[0] == 'macIssueTime':
-       data.append([key[0], binascii.b2a_hex(key[1]).decode('ascii')])
-      else:
-       data.append([key[0], key[1].decode('ascii').split('\x00')[0]])
-    except StopIteration:
-     pass
-
-    if file:
-     file.write(json.dumps(data, indent=4))
-    else:
-     for k, v in data:
-      print('%-20s%s' % (k + ': ', v))
-
-
-def wifiCommand(write=None, file=None, multi=False, driverName=None):
- """Read/Write WiFi information for the camera connected via usb"""
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device:
-   if not isinstance(device, SonyExtCmdDevice):
-    print('Error: Cannot use camera in this mode.')
-   else:
-    dev = SonyExtCmdCamera(device)
-
-    if write:
-     incoming = json.load(write)
-     data = struct.pack('<i', int(len(incoming)/3))
-
-     mydict = {}
-     count = 1
-     for key in incoming:
-      if key[0] == 'keyType':
-       mydict[key[0]] = key[1] # Integer
-      else:
-       mydict[key[0]] = key[1].encode('ascii')
-
-      if count == 3:
-       # reassemble Struct
-       apinfo = SonyExtCmdCamera.APInfo.pack(
-        keyType = mydict['keyType'],
-        sid = mydict['sid'].ljust(33, b'\x00'),
-        key = mydict['key'].ljust(65, b'\x00'),
-       )
-       data += apinfo
-       count = 1
-      else:
-       count += 1
-
-     if multi:
-      dev.setMultiWifiAPInfo(data)
-     else:
-      dev.setWifiAPInfo(data)
-     return
-
-    # Read settings from camera
-    if multi:
-     settings = dev.getMultiWifiAPInfo()
-    else:
-     settings = dev.getWifiAPInfo()
-
-    data = []
-    try:
-     for key in next(settings)._asdict().items():
-      if key[0] == 'keyType':
-       data.append([key[0], key[1]]) # Integer
-      else:
-       data.append([key[0],key[1].decode('ascii').split('\x00')[0]])
-    except StopIteration:
-     pass
-
-    if file:
-     file.write(json.dumps(data, indent=4))
-    else:
-     for k, v in data:
-      print('%-20s%s' % (k + ': ', v))
-
-
-def senserShellCommand(driverName=None, complete=None):
- if driverName is None and sys.platform != 'win32':
-  driverName = 'libusb'
- with importDriver(driverName) as driver:
-  device = getDevice(driver)
-  if device and isinstance(device, SonyMscExtCmdDevice):
-   if not isinstance(device.driver, GenericUsbDriver):
-    print('Error: Only libusb drivers are supported for switching to service mode.')
-    if sys.platform == 'win32':
-     print('Please use Zadig to install the libusb-win32 driver for the mass storage device.')
-    return
-
-   print('Switching to service mode')
-   dev = SonySenserAuthDevice(device.driver)
-   dev.start()
-   dev.authenticate()
-
-   device = None
-   print('')
-   print('Waiting for camera to switch...')
-   for i in range(10):
-    time.sleep(.5)
-    try:
-     devices = list(listDevices(driver, True))
-     if len(devices) == 1 and isinstance(devices[0], SonySenserDevice):
-      device = devices[0]
-      break
-    except:
-     pass
-   else:
-    print('Operation timed out. Please run this command again when your camera has connected.')
-
-  if device and isinstance(device, SonySenserDevice):
-   if not isinstance(device.driver, GenericUsbDriver):
-    print('Error: Only libusb drivers are supported for service mode.')
-    if sys.platform == 'win32':
-     print('Please use Zadig to install the libusb-win32 driver for the service mode device.')
-    return
-
-   print('Authenticating')
-   dev = SonySenserAuthDevice(device.driver)
-   dev.start()
-   dev.authenticate()
-   try:
-    if complete:
-     complete(SonySenserCamera(device))
-    else:
-     print('Starting service shell...')
-     print('')
-     CameraShell(SenserPlatformBackend(SonySenserCamera(device))).run()
-   finally:
-    dev.stop()
-   print('Done')
-  elif device:
-   print('Error: Cannot use camera in this mode. Please switch to mass storage mode.')

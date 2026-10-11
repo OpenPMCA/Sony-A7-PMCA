@@ -1,5 +1,6 @@
 """A wrapper to use libusb. Default on linux, on Windows you have to install a generic driver for your camera"""
 
+import sys
 import usb.core
 import usb.util
 
@@ -70,6 +71,14 @@ class UsbBackend(BaseUsbBackend):
     self.dev.detach_kernel_driver(0)
   except NotImplementedError:
    pass
+  except usb.core.USBError as e:
+   import sys
+   # On macOS Darwin, ptpcamerad manages MTP without a kernel driver;
+   # detach_kernel_driver raises LIBUSB_ERROR_ACCESS (-3). Only ignore on Darwin.
+   if sys.platform == 'darwin' and getattr(e, 'backend_error_code', None) == -3:
+    pass
+   else:
+    raise
 
  def clearHalt(self, ep):
   self.dev.clear_halt(ep)

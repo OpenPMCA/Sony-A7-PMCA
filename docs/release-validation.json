@@ -1,0 +1,106 @@
+{
+  "verification_date": "2026-10-11",
+  "version": "1.0.0",
+  "source_tests": {
+    "passed": 162,
+    "failed": 0,
+    "command": ".venv/bin/python -W error::ResourceWarning -m unittest discover -s tests -v"
+  },
+  "native_gui": {
+    "acceptance_passed": 23,
+    "touchpad_dispatch_passed": 8,
+    "minimum_text_clipping": {
+      "application": [],
+      "info": []
+    }
+  },
+  "catalog": {
+    "downloaded_and_validated": 26,
+    "installed_during_audit": 0,
+    "evidence": "docs/appstore-download-validation.json"
+  },
+  "frozen_module_parity": {
+    "checks": [
+      {
+        "module": "pmca-gui",
+        "file": "pmca-gui.py",
+        "source_sha256": "565e45cc137f1fff77d39947268b6f51d349234496ec44b1a25803271c852ae7",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.appstore.catalog",
+        "file": "pmca/appstore/catalog.py",
+        "source_sha256": "2cadd6a020b58f6febb5cfc0a8b5ff5d2fd2902f53e382e0f5a59e3e7be6104e",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.appstore.recipelab",
+        "file": "pmca/appstore/recipelab.py",
+        "source_sha256": "8afd1f142f3e56a32cd9922f1d9f1a02aeda1c178359ea29e8f3d37ae49ced3f",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.util.shutter",
+        "file": "pmca/util/shutter.py",
+        "source_sha256": "c68944d14c9f937f90d2516e33f87a3de2d88eacd3e5748270eef8122f037e99",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.commands.usb",
+        "file": "pmca/commands/usb.py",
+        "source_sha256": "4c5221d6335b2333d33de826d28b75a6e2f7f19568d831f1d51624b52f343aa1",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.usb",
+        "file": "pmca/usb/__init__.py",
+        "source_sha256": "269bc856a19ee373c378410418636ed18a60ad3cbb13f3fd4426ed911a66a08a",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.usb.driver.generic",
+        "file": "pmca/usb/driver/generic/__init__.py",
+        "source_sha256": "af3631a8672b45c7262edcead5a583d7222cd8611b89727ec4cc507f2cfca4dd",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.usb.driver.generic.libusb",
+        "file": "pmca/usb/driver/generic/libusb.py",
+        "source_sha256": "f79e1b3b87bbfa9781cd0f7d2ab4d794f93ad0582ed3bd4bd5241c882fc75980",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.marketserver.server",
+        "file": "pmca/marketserver/server.py",
+        "source_sha256": "60cf19b5e8dfe6bf10b8a1c7fa5b3a1db4365616c461a131b2600ed974723bf6",
+        "entire_code_tree_equal": true
+      },
+      {
+        "module": "pmca.apk",
+        "file": "pmca/apk/__init__.py",
+        "source_sha256": "2ae3a25a29271d6bd8fa314239750a6ab48b53f8296f455159aa400c0202d6a9",
+        "entire_code_tree_equal": true
+      }
+    ],
+    "all_equal": true
+  },
+  "macos": {
+    "asset": "dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip",
+    "sha256": "bb3a09234b97c480d39ed0a16b68646c1378c355e306cf71d18a340208074cb5",
+    "minimum_os": "27.0",
+    "architecture": "arm64",
+    "tls_cipher": "AES256-SHA",
+    "tls_version": "TLSv1.2",
+    "signature": "ad-hoc deep/strict verified",
+    "archive_extracted_runtime_verified": true,
+    "homebrew_cask_evaluated": true,
+    "published": false
+  },
+  "remaining_gates": [
+    "Windows native EXE build/runtime and camera compatibility checks",
+    "Linux native AppImage build/runtime and camera compatibility checks",
+    "macOS Developer ID signing/notarization and older-OS compatibility decision",
+    "Explicit authorization for public release and Homebrew download publication",
+    "Live image-based shutter verification after normal MTP camera reconnection"
+  ]
+}

@@ -4,7 +4,6 @@
 
 from ctypes import *
 from ctypes.util import *
-import os
 
 from . import *
 
@@ -99,18 +98,14 @@ class MscContext(BaseUsbContext):
 
 
 def isMscDriverAvailable():
- return _isKextLoaded() or _isKextInstalled()
+ return _isKextLoaded()
 
-
-def _isKextInstalled():
- for name in kextNames.keys():
-  if os.path.exists('/Library/Extensions/%s.kext/Contents/Info.plist' % name):
-   return True
- return False
 
 def _isKextLoaded():
  loaded = False
  infos = iokit.KextManagerCopyLoadedKextInfo(0, 0)
+ if not infos:
+  return False
 
  for name in kextNames.values():
   key = cf.CFStringCreateWithCString(0, name, 0)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A command line application to install apps on Android-enabled Sony cameras"""
+"""Sony A7 PMCA: Command line application to install apps on Android-enabled Sony cameras"""
 import argparse
 
 from pmca.commands.backup import *
@@ -10,14 +10,14 @@ from pmca import spk
 if getattr(sys, 'frozen', False):
  from frozenversion import version
 else:
- version = None
+ from pmca import __version__ as version
 
 def main():
  """Command line main"""
- parser = argparse.ArgumentParser()
+ parser = argparse.ArgumentParser(prog="Sony A7 PMCA", description="Sony A7 PMCA: Command line application to install apps on Android-enabled Sony cameras")
  if version:
   parser.add_argument('--version', action='version', version=version)
- drivers = ['native', 'libusb', 'qemu']
+ drivers = ['native', 'libusb', 'libusb-mtp', 'qemu']
  subparsers = parser.add_subparsers(dest='command', title='commands')
  info = subparsers.add_parser('info', description='Display information about the camera connected via USB')
  info.add_argument('-d', dest='driver', choices=drivers, help='specify the driver')

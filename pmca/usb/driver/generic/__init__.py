@@ -211,8 +211,13 @@ class MtpDriver(GenericUsbDriver, BaseMtpDriver):
   while data == b'':
    data = self.read(self.MAX_PKG_LEN)
   header = PtpHeader.unpack(data)
-  if header.size > self.MAX_PKG_LEN:
-   data += self.read(header.size - self.MAX_PKG_LEN)
+  remaining = header.size - len(data)
+  while remaining > 0:
+   chunk = self.read(remaining)
+   if not chunk:
+    raise GenericUsbException('Unexpected end of PTP data stream')
+   data += chunk
+   remaining -= len(chunk)
   return header.type, header.code, header.transaction, data[PtpHeader.size:PtpHeader.size+header.size]
 
  def _readData(self):

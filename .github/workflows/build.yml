@@ -1,53 +1,177 @@
-name: Build
-on: push
+name: Build and Verify Native Desktop Distribution
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  PyInstaller:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-2019, macos-10.15]
-    defaults:
-      run:
-        shell: bash
+  build-macos:
+    name: macOS (Apple Silicon ARM64)
+    runs-on: macos-14
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: 3.6
-    - name: Install libusb (windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        Invoke-WebRequest http://jaist.dl.sourceforge.net/project/libusb-win32/libusb-win32-releases/1.2.6.0/libusb-win32-bin-1.2.6.0.zip -OutFile libusb-win32-bin-1.2.6.0.zip
-        Expand-Archive libusb-win32-bin-1.2.6.0.zip .
-        Move-Item libusb-win32-bin-1.2.6.0\bin\amd64\libusb0.dll .
-        echo $env:GITHUB_WORKSPACE | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: Install libusb (macos)
-      if: runner.os == 'macOS'
-      run: |
-        brew install libusb
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    - name: Build
-      run: |
-        python -OO -m PyInstaller pmca-console.spec
-        python -OO -m PyInstaller pmca-gui.spec
-    - name: Test
-      run: |
-        dist/pmca-console* -h
-    - name: Upload
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ runner.os }} binaries
-        path: dist/*
-    - name: Release
-      if: ${{ startsWith(github.ref, 'refs/tags/') && runner.os != 'Windows' }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        tag="${GITHUB_REF##*/}"
-        assets="$(find dist/* -exec echo -a {} \;)"
-        hub release create $assets -m "$tag" "$tag" || hub release edit $assets -m "" "$tag"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          brew install libusb
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit test suite
+        run: |
+          python -W error::ResourceWarning -m unittest discover -s tests -v
+
+      - name: Run Tk GUI smoke test
+        run: |
+          python tests/smoke_gui.py
+
+      - name: Build macOS bundle
+        run: |
+          python packaging/build.py build --spec sony-a7-pmca.spec
+
+      - name: Verify frozen runtime
+        run: |
+          "dist/Sony A7 PMCA.app/Contents/MacOS/Sony A7 PMCA" --check-runtime dist/runtime-check.json
+          python packaging/build.py verify --report dist/runtime-check.json --arch arm64
+
+      - name: Package macOS distribution archive and Cask
+        run: |
+          python packaging/build.py package
+
+      - name: Verify Homebrew Cask syntax
+        run: |
+          ruby -c Casks/sony-a7-pmca.rb
+
+      - name: Upload macOS distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sony-A7-PMCA-1.0.0-macos-arm64
+          path: |
+            dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip
+            dist/runtime-check.json
+            Casks/sony-a7-pmca.rb
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows (x64)
+    runs-on: windows-2022
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install libusb-package==1.0.30.0
+
+      - name: Run unit test suite
+        shell: bash
+        run: |
+          python -W error::ResourceWarning -m unittest discover -s tests -v
+
+      - name: Run Tk GUI smoke test
+        shell: bash
+        run: |
+          python tests/smoke_gui.py
+
+      - name: Build Windows one-file executable
+        shell: bash
+        run: |
+          python packaging/build.py build --spec packaging/desktop.spec
+
+      - name: Package Windows executable
+        shell: bash
+        run: |
+          python packaging/build.py package
+
+      - name: Verify frozen runtime
+        shell: pwsh
+        run: |
+          python packaging/build.py verify --executable "dist\Sony-A7-PMCA-1.0.0-windows-x64.exe" --arch x64
+
+      - name: Upload Windows distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sony-A7-PMCA-1.0.0-windows-x64
+          path: |
+            dist/Sony-A7-PMCA-1.0.0-windows-x64.exe
+            dist/runtime-check.json
+          if-no-files-found: error
+
+  build-linux:
+    name: Linux (x86_64 AppImage)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libusb-1.0-0 libusb-1.0-0-dev python3-tk xvfb libfuse2
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit test suite under Xvfb
+        run: |
+          xvfb-run -a python -W error::ResourceWarning -m unittest discover -s tests -v
+
+      - name: Run Tk GUI smoke test under Xvfb
+        run: |
+          xvfb-run -a python tests/smoke_gui.py
+
+      - name: Build Linux binary directory
+        run: |
+          python packaging/build.py build --spec packaging/desktop.spec
+
+      - name: Verify frozen runtime under Xvfb
+        run: |
+          xvfb-run -a dist/Sony-A7-PMCA/Sony-A7-PMCA --check-runtime dist/runtime-check.json
+          python packaging/build.py verify --report dist/runtime-check.json --arch x64
+
+      - name: Package Linux AppImage
+        run: |
+          python packaging/build.py package
+
+      - name: Verify final AppImage under Xvfb
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          xvfb-run -a python packaging/build.py verify --executable dist/Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
+
+      - name: Upload Linux distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sony-A7-PMCA-1.0.0-linux-x86_64
+          path: |
+            dist/Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage
+            dist/runtime-check.json
+          if-no-files-found: error

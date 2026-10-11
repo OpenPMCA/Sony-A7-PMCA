@@ -1,84 +1,90 @@
-# Reverse Engineering Sony Digital Cameras
-This tool interfaces with Sony digital cameras through USB. It allows to tweak settings, dump firmware, and in some cases install custom Android apps.
+# Sony A7 PMCA
 
-## Installation
-There are two binaries:
+[![Native builds](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
 
-* **pmca-console**: The main command line application
-* **pmca-gui**: A graphical user interface with a limited set of features
+A native desktop app manager and diagnostics toolkit for Sony cameras that support **PlayMemories Camera Apps**.
 
-### Windows
-The application should work fine on Windows using the operating system's mass storage and MTP USB drivers.
+Sony A7 PMCA focuses on a straightforward workflow: connect a camera, inspect its information, download or select an APK, and install it with explicit confirmation. It builds on [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) and the OpenMemories community.
 
-Download the [latest stable release](https://github.com/ma1co/Sony-PMCA-RE/releases/latest) or the newest [development build](https://ci.appveyor.com/project/ma1co/sony-pmca-re/build/artifacts).
+> **Status:** Version 1.0.0 is under active validation. macOS Apple Silicon has local build/runtime evidence and an ILCE-7 RecipeLab installation was confirmed. Windows EXE and Linux AppImage have native CI build paths; their actual results are tracked separately. A prepared package or passing source test is not a production compatibility guarantee.
 
-### macOS
-macOS binaries are also distributed, but less tested than the Windows equivalents. Getting the USB drivers to work may require some fiddling. To communicate with cameras in mass storage mode, Sony's [Camera Driver](https://support.d-imaging.sony.co.jp/mac/driver/11/ja/) has to be installed. Make sure to close all applications which could access USB drivers, including Photos, Dropbox and Google Drive.
+## What it does
 
-The latest release binaries can be found in the [release section](https://github.com/ma1co/Sony-PMCA-RE/releases/latest).
+- **Info:** automatic connection tracking, reconnect, camera identity, transport capabilities and available lens information. Body firmware is kept separate from the standard Picture Transfer Protocol version.
+- **Application:** compact local APK staging above a scrollable Store. Downloaded APKs are checked for package identity, Android minimum API and a parsable signing certificate before installation.
+- **Logs:** search and severity filtering, complete error copying, export and auto-follow that pauses when reading earlier output.
+- **Community catalog:** curated download sources with version information and model-specific caveats. Metadata refresh never installs an app automatically.
+- **Shutter metadata:** bounded read-only parsing of Sony MakerNote counters from an existing camera image. Results identify the examined image and limitations, including flash rollover. This is an image-time count, not a guaranteed live lifetime counter.
 
-### Linux
-The application uses Python 3 and should work fine on Linux using libusb drivers.
+The existing command-line toolkit remains available for advanced workflows. The desktop app deliberately keeps only **Info**, **Application** and **Logs**.
 
-Clone or download this repository, then run the following commands:
-```bash
-pip install -r requirements.txt  # to install the dependencies
-./pmca-console.py  # for the command line application
-./pmca-gui.py  # for the gui application
+## Compatibility and installation
+
+Use a Sony camera with PlayMemories Camera Apps support, a USB data cable and **MTP** selected in the camera menu. Not every Sony Alpha body supports camera apps. Consult the [OpenMemories device list](https://openmemories.readthedocs.io/devices.html) and each application's own compatibility requirements.
+
+| Platform | Distribution target | Current evidence |
+|---|---|---|
+| Apple Silicon macOS | Native app bundle and ZIP; Homebrew cask | Local ARM64 runtime, encrypted TLS and bundle integrity verified. The current local dependencies require macOS 27 or newer. |
+| Windows x64 | Standalone `.exe` | Native Windows build and runtime checks are defined in CI. See the current workflow result before relying on a build. |
+| Linux x86_64 | `.AppImage` | Native Linux build and final AppImage runtime checks are defined in CI. See the current workflow result before relying on a build. |
+
+Build artifacts are produced by [GitHub Actions](https://github.com/OpenPMCA/Sony-A7-PMCA/actions). Stable downloads will be listed under [Releases](https://github.com/OpenPMCA/Sony-A7-PMCA/releases) when published. A release URL in the cask does **not** mean the binary has already been published.
+
+Homebrew installation is prepared for after a corresponding release is available:
+
+```sh
+brew tap OpenPMCA/Sony-A7-PMCA https://github.com/OpenPMCA/Sony-A7-PMCA
+brew install --cask sony-a7-pmca
 ```
 
-## Usage
-There are three main modes of interfacing with a camera:
+The current macOS build is ad-hoc signed, not Apple Developer ID signed or notarized. See [distribution and release gates](docs/distribution.md) for the exact limitations.
 
-### App Installer
-If the camera supports *PlayMemories Camera Apps (PMCA)*, it is possible to install custom Android apps using this tool. A list of supported cameras can be found [here](https://openmemories.readthedocs.io/devices.html).
+## Build from source
 
-It is recommended to install the [*OpenMemories: Tweak*](https://github.com/ma1co/OpenMemories-Tweak) app. This app allows to tweak settings and to start *telnet* and *adb* servers to execute code on the system.
+```sh
+git clone --recurse-submodules https://github.com/OpenPMCA/Sony-A7-PMCA.git
+cd Sony-A7-PMCA
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python pmca-gui.py
+```
 
-Other apps are available. A list can be found [here](https://github.com/ma1co/OpenMemories-AppList).
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1`. Source execution requires a Tk-capable Python interpreter and the platform's camera transport dependencies. macOS and Linux use libusb. Windows uses native Windows Portable Devices with a libusb fallback.
 
-There are two ways to install apps:
-* **pmca-gui**: In the *Install app* tab, select an app from the list and click *Install selected app*.
-* **pmca-console**: Run `pmca-console install -i` to interactively select an app to install.
+Native packaging must run on the target operating system:
 
-### Firmware Updater
-Sony cameras can boot from a secondary partition for firmware updates. Using a custom firmware file, we can execute code in this mode. Note that the camera firmware itself remains untouched. The firmware update process is only used to execute custom code.
+```sh
+python packaging/build.py build
+python packaging/build.py package
+```
 
-This mode does not require any special drivers, the operating system's mass storage USB driver is enough.
+See the [macOS guide](docs/macOS.md), [backend API](docs/backend-api.md) and [distribution guide](docs/distribution.md) for setup, diagnostics and native build details.
 
-A list of supported camera models can be found [here](https://openmemories.readthedocs.io/devices.html). Devices based on the CXD90045 and CXD90057 architectures are not compatible, since their firmware is cryptographically signed.
+## Testing status
 
-There are two ways to use this:
-* **pmca-gui**: In the *Tweaks* tab, click *Start tweaking (updater mode)*. You can then use the checkboxes to configure your camera's settings.
-* **pmca-console**: Run `pmca-console updatershell`. There are commands available to dump the firmware, execute Linux commands, and to tweak settings.
+Testing results distinguish software contracts from native runtime and physical-camera evidence. See [Testing status](docs/testing-status.md) for commands, dated outcomes, open gaps and the latest CI links.
 
-Note that this requires rebooting the camera to firmware update mode. You will be guided through this process.
+The catalog download audit checks manifest package/API/certificate data. It does **not** establish that every catalog app runs on every camera. RecipeLab is the application whose installation was confirmed on the ILCE-7. Live shutter validation remains pending a suitable connected-camera image.
 
-### Service Mode
-Sony cameras have a USB mode called *senser mode*, which is used during servicing for calibration and other things. It can also be used to execute code on the running system.
+Run local checks without making a camera installation:
 
-Service mode has the best camera compatibility, but requires custom USB drivers.
+```sh
+python -W error::ResourceWarning -m unittest discover -s tests -v
+python tests/smoke_gui.py
+```
 
-It is currently only supported in the command line application:
-* **pmca-console**: Run `pmca-console serviceshell`. There are commands available to dump the firmware and to execute Linux commands.
+The frozen app also provides `--check-runtime <report.json>` for bundled-library, certificate, encryption and local TLS diagnostics. CI validates the actual final executable or AppImage rather than treating build configuration as a successful runtime test.
 
-#### Windows Drivers
-To use service mode on Windows, custom drivers have to be installed using [Zadig](http://zadig.akeo.ie/):
-* Make sure the camera is connected in mass storage mode.
-* In Zadig, check *Options -> List All Devices*, select the camera, select *libusb-win32* and click *Replace Driver*.
-* Run `pmca-console serviceshell` to make the camera switch modes.
-* Once the camera has switched, repeat the above step to install a driver for service mode.
-* You should now be able to use `pmca-console serviceshell`.
+## Safety, privacy and attribution
 
-To be able to use the camera normally again, the libusb drivers have to be uninstalled in device manager.
+- Keep the camera powered and connected during a transfer. Do not interrupt an active installation.
+- Install only applications you trust. Package/API/certificate checks are not a security audit or a universal compatibility guarantee.
+- The utility does not require disabling System Integrity Protection, killing camera services or changing unrelated computer security settings.
+- Local logs and diagnostics can contain camera identifiers. Review and redact them before sharing an issue or report.
+- The included camera-installation certificate is the upstream public test fixture used by the local market server, not a user account credential or a production web-server secret.
 
-## Is it safe?
-This is an experiment in a very early stage. All information has been found through reverse engineering. Even though everything worked fine for our developers, it could cause harm to your hardware. If you break your camera, you get to keep both pieces. **We won't take any responsibility.**
+This is an independent community project, not an official Sony product. Camera modification carries risk. Read the [original app-installation notes](docs/AppInstallation.md) before advanced use.
 
-## What about custom apps?
-It is possible to develop custom Android apps for supported cameras. Keep in mind that they should be compatible with Android 2.3.7. Debug and release certificates are accepted by the camera. See [*PMCADemo*](https://github.com/ma1co/PMCADemo) for a demo app.
-
-There are a few special Sony APIs which allow you to take advantage of the features of your camera. They can be used through [*OpenMemories: Framework*](https://github.com/ma1co/OpenMemories-Framework).
-
-## Special thanks
-Without the work done by the people at [nex-hack](http://www.personal-view.com/faqs/sony-hack/hack-development), this wouldn't have been possible. Thanks a lot!
+The original **MIT license and copyright attribution to ma1co are retained** in [LICENSE.txt](LICENSE.txt). Community camera applications remain separate projects under their maintainers' licenses; the Store references their download sources rather than bundling their APKs.

@@ -5,7 +5,10 @@ from .driver import *
 from ..util import *
 
 MscDeviceInfo = namedtuple('MscDeviceInfo', 'manufacturer, model')
-MtpDeviceInfo = namedtuple('MtpDeviceInfo', 'manufacturer, model, serialNumber, operationsSupported, vendorExtension')
+PtpObjectInfo = namedtuple('PtpObjectInfo', 'storageId, format, size, filename, captureDate, modificationDate')
+
+class MtpDeviceInfo(namedtuple('MtpDeviceInfoBase', 'manufacturer, model, serialNumber, operationsSupported, vendorExtension, version, devicePropertiesSupported, eventsSupported, captureFormats, imageFormats', defaults=('', frozenset(), frozenset(), frozenset(), frozenset()))):
+ pass
 
 class MscException(Exception):
  pass
@@ -30,27 +33,21 @@ class UsbDevice(object):
 
 
 class MscDevice(UsbDevice):
- """Manages communication with a USB mass storage device"""
- MSC_OC_INQUIRY = 0x12
+ """Manages communication with a USB mass storage device. Inspired by libreadspeaker"""
+ DEFAULT_TIMEOUT = 1000
 
- MSC_SENSE_InvalidCommandOperationCode = (0x5, 0x20, 0x0)
+ SONY_SENSE_NOT_READY = (0x02, 0x04, 0x01)
+ SONY_SENSE_NOT_FOUND = (0x05, 0x24, 0x00)
 
- def _checkResponse(self, sense):
-  if sense != MSC_SENSE_OK:
-   msg = 'Mass storage error: Sense 0x%x 0x%x 0x%x' % sense
-   if sense == self.MSC_SENSE_InvalidCommandOperationCode:
-    raise InvalidCommandException(msg)
-   elif sense == MSC_SENSE_ERROR_UNKNOWN:
-    raise UnknownMscException(msg)
+ def _checkResponse(self, response):
+  if response.status != 0:
+   if response.sense == self.SONY_SENSE_NOT_FOUND:
+    raise InvalidCommandException()
    else:
-    raise MscException(msg)
+    raise UnknownMscException('SCSI sense %x %x %x' % response.sense)
 
- def reset(self):
-  super(MscDevice, self).reset()
-  self.driver.sendCommand(6 * b'\0')
-
- def _sendInquiryCommand(self, size):
-  response, data = self.driver.sendReadCommand(dump8(self.MSC_OC_INQUIRY) + 3*b'\0' + dump8(size) + b'\0', size)
+ def _sendInquiryCommand(self, length):
+  response, data = self.driver.sendReadCommand(b'\x12' + b'\0\0' + dump8(length) + b'\0', length, self.DEFAULT_TIMEOUT)
   self._checkResponse(response)
   return data
 
@@ -74,6 +71,11 @@ class MtpDevice(UsbDevice):
  PTP_RC_ParameterNotSupported = 0x2006
  PTP_RC_DeviceBusy = 0x2019
  PTP_RC_SessionAlreadyOpened = 0x201E
+ PTP_OC_GetStorageIDs = 0x1004
+ PTP_OC_GetStorageInfo = 0x1005
+ PTP_OC_GetObjectHandles = 0x1007
+ PTP_OC_GetObjectInfo = 0x1008
+ PTP_OC_GetPartialObject = 0x101b
 
  def __init__(self, driver):
   super(MtpDevice, self).__init__(driver)
@@ -115,7 +117,18 @@ class MtpDevice(UsbDevice):
   offset, version = self._parseString(data, offset)
   offset, serial = self._parseString(data, offset)
 
-  return MtpDeviceInfo(manufacturer, model, serial, set(operationsSupported), vendorExtension)
+  return MtpDeviceInfo(
+   manufacturer,
+   model,
+   serial,
+   set(operationsSupported),
+   vendorExtension,
+   version,
+   set(devicePropertiesSupported),
+   set(eventsSupported),
+   set(captureFormats),
+   set(imageFormats),
+  )
 
  def openSession(self, id=1):
   """Opens a new MTP session"""
@@ -132,3 +145,42 @@ class MtpDevice(UsbDevice):
   response, data = self.driver.sendReadCommand(self.PTP_OC_GetDeviceInfo, [])
   self._checkResponse(response)
   return self._parseDeviceInfo(data)
+
+ def _parseObjectInfo(self, data):
+  if len(data) < 52:
+   raise MtpException('Malformed ObjectInfo response: dataset shorter than 52 bytes (got %d)' % len(data))
+  storageId = parse32le(data[:4])
+  fmt = parse16le(data[4:6])
+  size = parse32le(data[8:12])
+  offset = 52
+  try:
+   offset, filename = self._parseString(data, offset)
+   offset, captureDate = self._parseString(data, offset)
+   offset, modDate = self._parseString(data, offset)
+  except Exception as e:
+   raise MtpException('Malformed ObjectInfo string table: %s' % e)
+  return PtpObjectInfo(storageId, fmt, size, filename, captureDate, modDate)
+
+ def getObjectInfo(self, handle):
+  """Gets and parses PTP ObjectInfo dataset (PTP 0x1008)"""
+  response, data = self.driver.sendReadCommand(self.PTP_OC_GetObjectInfo, [handle])
+  self._checkResponse(response)
+  return self._parseObjectInfo(data)
+
+ def getObjectHandles(self, storageId=0xffffffff, formatCode=0x0000, parentHandle=0x00000000):
+  """Gets object handles on camera storage (PTP 0x1007)"""
+  response, data = self.driver.sendReadCommand(self.PTP_OC_GetObjectHandles, [storageId, formatCode, parentHandle])
+  self._checkResponse(response)
+  if len(data) < 4:
+   raise MtpException('Truncated GetObjectHandles response: packet shorter than 4 bytes (got %d)' % len(data))
+  length = parse32le(data[:4])
+  expected_size = 4 + length * 4
+  if len(data) != expected_size:
+   raise MtpException('Malformed GetObjectHandles response: declared %d handles (%d bytes), received %d bytes' % (length, expected_size, len(data)))
+  return [parse32le(data[4+i*4:8+i*4]) for i in range(length)]
+
+ def getPartialObject(self, handle, offset=0, maxBytes=65536):
+  """Reads a partial slice of an object over PTP without full bulk transfer (PTP 0x101b)"""
+  response, data = self.driver.sendReadCommand(self.PTP_OC_GetPartialObject, [handle, offset, maxBytes])
+  self._checkResponse(response)
+  return data
