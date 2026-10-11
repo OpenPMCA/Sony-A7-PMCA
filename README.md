@@ -109,9 +109,9 @@ All builds and tests are continuously validated via GitHub Actions native runner
 
 | Test Target | Runner | Evidence & Results | Status |
 | :--- | :--- | :--- | :---: |
-| **macOS Native CI** | `macos-14` (Apple Silicon) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Unit tests, Tk smoke, PyInstaller, `--check-runtime` | ✅ **PASS** |
-| **Windows Native CI** | `windows-2022` (x64) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Unit tests, Tk smoke, one-file EXE, `--check-runtime` | ✅ **PASS** |
-| **Linux Native CI** | `ubuntu-22.04` (x86_64) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Xvfb tests, smoke, `appimagetool` packaging, AppImage verification | ✅ **PASS** |
+| **macOS Native CI** | `macos-14` (Apple Silicon) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Unit tests, Tk smoke, PyInstaller, `--check-runtime` | ✅ **PASS** |
+| **Windows Native CI** | `windows-2022` (x64) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Unit tests, Tk smoke, one-file EXE, `--check-runtime` | ✅ **PASS** |
+| **Linux Native CI** | `ubuntu-22.04` (x86_64) | [Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230): Xvfb tests, smoke, `appimagetool` packaging, AppImage verification | ✅ **PASS** |
 | **Unit Test Suite** | Local / CI | 165 tests (162 passed, 3 optional fixture skips without environment variable) | ✅ **PASS** |
 | **Store APK Validation** | Local / CI | 26/26 community APKs downloaded & validated ([Audit Evidence](docs/appstore-download-validation.json)) | ✅ **PASS** |
 | **Real Hardware** | Physical ILCE-7 | End-to-end RecipeLab 1.6.2 install verified with camera result code `0` | ✅ **PASS** |
