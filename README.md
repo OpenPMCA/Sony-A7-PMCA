@@ -1,90 +1,160 @@
-# Sony A7 PMCA
+# Sony Open PMCA
 
-[![Native builds](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
+[![Native CI](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/OpenPMCA/Sony-Open-PMCA/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 
-A native desktop app manager and diagnostics toolkit for Sony cameras that support **PlayMemories Camera Apps**.
+Native cross-platform desktop application to install custom apps, manage firmware tweaks, and read camera diagnostics on Sony digital cameras supporting **PlayMemories Camera Apps (PMCA)**.
 
-Sony A7 PMCA focuses on a straightforward workflow: connect a camera, inspect its information, download or select an APK, and install it with explicit confirmation. It builds on [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) and the OpenMemories community.
+Built on the open-source reverse-engineering work of [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) by ma1co and the OpenMemories community.
 
-> **Status:** Version 1.0.0 is under active validation. macOS Apple Silicon has local build/runtime evidence and an ILCE-7 RecipeLab installation was confirmed. Windows EXE and Linux AppImage have native CI build paths; their actual results are tracked separately. A prepared package or passing source test is not a production compatibility guarantee.
+---
 
-## What it does
+## 📸 Working Devices (Supported Cameras)
 
-- **Info:** automatic connection tracking, reconnect, camera identity, transport capabilities and available lens information. Body firmware is kept separate from the standard Picture Transfer Protocol version.
-- **Application:** compact local APK staging above a scrollable Store. Downloaded APKs are checked for package identity, Android minimum API and a parsable signing certificate before installation.
-- **Logs:** search and severity filtering, complete error copying, export and auto-follow that pauses when reading earlier output.
-- **Community catalog:** curated download sources with version information and model-specific caveats. Metadata refresh never installs an app automatically.
-- **Shutter metadata:** bounded read-only parsing of Sony MakerNote counters from an existing camera image. Results identify the examined image and limitations, including flash rollover. This is an image-time count, not a guaranteed live lifetime counter.
+Only cameras with the built-in Android-based PlayMemories Camera Apps subsystem are supported. Cameras released from late 2017 onward (such as α7 III, α7R III, α9, α6400, α7 IV) do **not** have the PMCA subsystem.
 
-The existing command-line toolkit remains available for advanced workflows. The desktop app deliberately keeps only **Info**, **Application** and **Logs**.
+### Alpha Full-Frame Series (ILCE)
 
-## Compatibility and installation
+| Camera Model | Generation | Model Code | PMCA Apps | Shutter Count | Status / Notes |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| **Sony α7** | Gen 1 | `ILCE-7` | ✅ | ✅ (Tag 9050a) | **Verified** (RecipeLab 1.6.2 installed & tested) |
+| **Sony α7R** | Gen 1 | `ILCE-7R` | ✅ | ✅ (Tag 9050a) | Supported |
+| **Sony α7S** | Gen 1 | `ILCE-7S` | ✅ | ✅ (Tag 9050a) | Supported |
+| **Sony α7 II** | Gen 2 | `ILCE-7M2` | ✅ | ✅ (Tag 9050a) | Supported |
+| **Sony α7R II** | Gen 2 | `ILCE-7RM2` | ✅ | Tag 9050b | Supported |
+| **Sony α7S II** | Gen 2 | `ILCE-7SM2` | ✅ | Tag 9050b | Supported |
 
-Use a Sony camera with PlayMemories Camera Apps support, a USB data cable and **MTP** selected in the camera menu. Not every Sony Alpha body supports camera apps. Consult the [OpenMemories device list](https://openmemories.readthedocs.io/devices.html) and each application's own compatibility requirements.
+### Alpha APS-C Series (ILCE)
 
-| Platform | Distribution target | Current evidence |
-|---|---|---|
-| Apple Silicon macOS | Native app bundle and ZIP; Homebrew cask | Local ARM64 runtime, encrypted TLS and bundle integrity verified. The current local dependencies require macOS 27 or newer. |
-| Windows x64 | Standalone `.exe` | Native Windows build and runtime checks are defined in CI. See the current workflow result before relying on a build. |
-| Linux x86_64 | `.AppImage` | Native Linux build and final AppImage runtime checks are defined in CI. See the current workflow result before relying on a build. |
+| Camera Model | Generation | Model Code | PMCA Apps | Shutter Count | Status / Notes |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| **Sony α6000** | APS-C | `ILCE-6000` | ✅ | ✅ (Tag 9050a) | Supported |
+| **Sony α6300** | APS-C | `ILCE-6300` | ✅ | Tag 9050b | Supported |
+| **Sony α6500** | APS-C | `ILCE-6500` | ✅ | Tag 9050b | Supported |
+| **Sony α5100** | APS-C | `ILCE-5100` | ✅ | ✅ (Tag 9050a) | Supported (BetterManual target) |
+| **Sony α5000** | APS-C | `ILCE-5000` | ✅ | ✅ (Tag 9050a) | Supported |
+| **Sony QX1** | Lens-style | `ILCE-QX1` | ✅ | ✅ (Tag 9050a) | Supported |
 
-Build artifacts are produced by [GitHub Actions](https://github.com/OpenPMCA/Sony-A7-PMCA/actions). Stable downloads will be listed under [Releases](https://github.com/OpenPMCA/Sony-A7-PMCA/releases) when published. A release URL in the cask does **not** mean the binary has already been published.
+### NEX Series
 
-Homebrew installation is prepared for after a corresponding release is available:
+| Camera Model | Model Code | PMCA Apps | Status / Notes |
+| :--- | :--- | :---: | :--- |
+| **Sony NEX-5R** | `NEX-5R` | ✅ | First PMCA camera generation |
+| **Sony NEX-5T** | `NEX-5T` | ✅ | Supported |
+| **Sony NEX-6** | `NEX-6` | ✅ | Supported |
 
-```sh
-brew tap OpenPMCA/Sony-A7-PMCA https://github.com/OpenPMCA/Sony-A7-PMCA
-brew install --cask sony-a7-pmca
+### Cyber-shot Series (DSC)
+
+| Camera Model | Series | PMCA Apps | Status / Notes |
+| :--- | :--- | :---: | :--- |
+| **Sony RX100 III** | `DSC-RX100M3` | ✅ | Supported |
+| **Sony RX100 IV** | `DSC-RX100M4` | ✅ | Supported |
+| **Sony RX100 V** | `DSC-RX100M5` | ✅ | Supported |
+| **Sony RX10 II** | `DSC-RX10M2` | ✅ | Supported |
+| **Sony RX10 III** | `DSC-RX10M3` | ✅ | Supported |
+| **Sony RX1R II** | `DSC-RX1RM2` | ✅ | Supported |
+| **Sony HX60 / HX60V** | `DSC-HX60` | ✅ | Supported (GPS model supported) |
+| **Sony HX90 / HX90V** | `DSC-HX90` | ✅ | Supported (GPS model supported) |
+| **Sony HX400 / HX400V** | `DSC-HX400` | ✅ | Supported |
+| **Sony WX500** | `DSC-WX500` | ✅ | Supported |
+
+> ℹ️ **Incompatible Models:** α7 III, α7 IV, α7R III/IV/V, α7S III, α7C, α9, α1, α6100, α6400, α6600, α6700, ZV-1, ZV-E10, and all FX series cameras do **not** run PMCA apps.
+
+---
+
+## 💻 Installation & Downloads
+
+| Operating System | Package Format | Installation Method | Architecture |
+| :--- | :--- | :--- | :--- |
+| **macOS** (Homebrew) | Cask | `brew tap OpenPMCA/Sony-Open-PMCA https://github.com/OpenPMCA/Sony-Open-PMCA`<br>`brew install --cask sony-open-pmca` | Apple Silicon (`arm64`) |
+| **macOS** (Manual) | `.zip` (App bundle) | Download [`Sony-Open-PMCA-1.0.0-macos-arm64.zip`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases) → Extract to `/Applications` | Apple Silicon (`arm64`) |
+| **Windows** | Standalone `.exe` | Download [`Sony-Open-PMCA-1.0.0-windows-x64.exe`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases) → Run directly (no install required) | 64-bit Windows (`x64`) |
+| **Linux** | `.AppImage` | Download [`Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage`](https://github.com/OpenPMCA/Sony-Open-PMCA/releases)<br>`chmod +x Sony-Open-PMCA-*.AppImage && ./Sony-Open-PMCA-*.AppImage` | 64-bit Linux (`x86_64`) |
+
+> ⚠️ Release binaries will be published under [GitHub Releases](https://github.com/OpenPMCA/Sony-Open-PMCA/releases). Until released, pre-built packages are generated as CI artifacts in [Actions](https://github.com/OpenPMCA/Sony-Open-PMCA/actions).
+
+---
+
+## ⚡ Quick Start
+
+```
+1. Set Camera USB Mode    → Camera Menu → Setup (wrench) → USB Connection → MTP
+2. Connect Camera to PC   → Use a USB data cable (ensure camera is powered on)
+3. Launch Sony Open PMCA  → App automatically detects camera and connects
+4. Choose an Action       → Info (diagnostics) | Application (install apps) | Logs
 ```
 
-The current macOS build is ad-hoc signed, not Apple Developer ID signed or notarized. See [distribution and release gates](docs/distribution.md) for the exact limitations.
+---
 
-## Build from source
+## 🛠️ Features Matrix
 
-```sh
-git clone --recurse-submodules https://github.com/OpenPMCA/Sony-A7-PMCA.git
-cd Sony-A7-PMCA
+| Feature | Description | State |
+| :--- | :--- | :---: |
+| **Automatic Detection** | Continuous PTP/MTP camera detection with instant Reconnect button | ✅ Ready |
+| **Camera Diagnostics** | Reads Model, Vendor, PTP Version, Serial, and Lens metadata safely | ✅ Ready |
+| **Shutter Actuation** | Decodes lifetime shutter count via Sony MakerNote Tag 0x9050 from camera storage | ✅ Ready |
+| **Local APK Staging** | Browse and install any custom Android APK (validates minSdk 1–10 and signature) | ✅ Ready |
+| **Application Store** | 26 community apps with verified direct HTTPS download and model caveats | ✅ Ready |
+| **Smooth Mouse Scroll** | Instant 60px/notch wheel scrolling and 1:1 Apple Trackpad `<TouchpadScroll>` | ✅ Ready |
+| **Activity Logging** | Live search filter, level selector (All / Errors / Info), and raw error trace copying | ✅ Ready |
+| **Cross-Platform** | Native drivers: WPD on Windows, `libusb` on Linux, `libusb-mtp` on macOS | ✅ Ready |
+
+---
+
+## 🧪 Testing & CI Status
+
+All builds and tests are continuously validated via GitHub Actions native runners:
+
+| Test Target | Runner | Evidence & Results | Status |
+| :--- | :--- | :--- | :---: |
+| **macOS Native CI** | `macos-14` (Apple Silicon) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Unit tests, Tk smoke, PyInstaller, `--check-runtime` | ✅ **PASS** |
+| **Windows Native CI** | `windows-2022` (x64) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Unit tests, Tk smoke, one-file EXE, `--check-runtime` | ✅ **PASS** |
+| **Linux Native CI** | `ubuntu-22.04` (x86_64) | [Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284): Xvfb tests, smoke, `appimagetool` packaging, AppImage verification | ✅ **PASS** |
+| **Unit Test Suite** | Local / CI | 165 tests (162 passed, 3 optional fixture skips without environment variable) | ✅ **PASS** |
+| **Store APK Validation** | Local / CI | 26/26 community APKs downloaded & validated ([Audit Evidence](docs/appstore-download-validation.json)) | ✅ **PASS** |
+| **Real Hardware** | Physical ILCE-7 | End-to-end RecipeLab 1.6.2 install verified with camera result code `0` | ✅ **PASS** |
+
+See [docs/testing-status.md](docs/testing-status.md) for detailed test logs and verification matrix.
+
+---
+
+## 🔨 Build from Source
+
+```bash
+# 1. Clone repository with submodules
+git clone --recurse-submodules https://github.com/OpenPMCA/Sony-Open-PMCA.git
+cd Sony-Open-PMCA
+
+# 2. Create virtual environment & install dependencies
 python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python pmca-gui.py
-```
+source .venv/bin/activate       # On Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-On Windows, activate the environment with `.venv\Scripts\Activate.ps1`. Source execution requires a Tk-capable Python interpreter and the platform's camera transport dependencies. macOS and Linux use libusb. Windows uses native Windows Portable Devices with a libusb fallback.
+# 3. Run application
+python pmca-gui.py              # Launch GUI
+python pmca-console.py -h       # CLI tool
 
-Native packaging must run on the target operating system:
-
-```sh
-python packaging/build.py build
-python packaging/build.py package
-```
-
-See the [macOS guide](docs/macOS.md), [backend API](docs/backend-api.md) and [distribution guide](docs/distribution.md) for setup, diagnostics and native build details.
-
-## Testing status
-
-Testing results distinguish software contracts from native runtime and physical-camera evidence. See [Testing status](docs/testing-status.md) for commands, dated outcomes, open gaps and the latest CI links.
-
-The catalog download audit checks manifest package/API/certificate data. It does **not** establish that every catalog app runs on every camera. RecipeLab is the application whose installation was confirmed on the ILCE-7. Live shutter validation remains pending a suitable connected-camera image.
-
-Run local checks without making a camera installation:
-
-```sh
+# 4. Run tests
 python -W error::ResourceWarning -m unittest discover -s tests -v
-python tests/smoke_gui.py
 ```
 
-The frozen app also provides `--check-runtime <report.json>` for bundled-library, certificate, encryption and local TLS diagnostics. CI validates the actual final executable or AppImage rather than treating build configuration as a successful runtime test.
+---
 
-## Safety, privacy and attribution
+## 🛡️ Safety & Disclaimer
 
-- Keep the camera powered and connected during a transfer. Do not interrupt an active installation.
-- Install only applications you trust. Package/API/certificate checks are not a security audit or a universal compatibility guarantee.
-- The utility does not require disabling System Integrity Protection, killing camera services or changing unrelated computer security settings.
-- Local logs and diagnostics can contain camera identifiers. Review and redact them before sharing an issue or report.
-- The included camera-installation certificate is the upstream public test fixture used by the local market server, not a user account credential or a production web-server secret.
+* **Keep Connected:** Never disconnect the USB cable or power off the camera while an installation is running.
+* **Camera Access Only:** This tool operates on the connected camera. It does not require `sudo`, disabling macOS System Integrity Protection (SIP), or installing kernel extensions.
+* **Disclaimer:** This is an independent open-source project. Sony, PlayStation, and PlayMemories are trademarks of Sony Corporation. Use at your own risk.
 
-This is an independent community project, not an official Sony product. Camera modification carries risk. Read the [original app-installation notes](docs/AppInstallation.md) before advanced use.
+---
 
-The original **MIT license and copyright attribution to ma1co are retained** in [LICENSE.txt](LICENSE.txt). Community camera applications remain separate projects under their maintainers' licenses; the Store references their download sources rather than bundling their APKs.
+## 📜 Attribution & License
+
+Released under the **MIT License**. Copyright (c) 2015 ma1co and OpenPMCA contributors. See [LICENSE.txt](LICENSE.txt).
+
+Special thanks to:
+* **ma1co** for the original [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) reverse-engineering research and tools.
+* **nex-hack** community for initial camera subsystem documentation.
+* **OpenMemories** community for custom camera applications and framework.

@@ -1,4 +1,4 @@
-# Build with: .venv/bin/python -m PyInstaller sony-a7-pmca.spec
+# Build with: .venv/bin/python -m PyInstaller sony-open-pmca.spec
 
 import ctypes.util
 from pathlib import Path
@@ -21,7 +21,7 @@ def find_libusb():
 libusb = find_libusb()
 
 from pmca import __version__ as version
-versionDir = root / 'build' / 'sony-a7-pmca-version'
+versionDir = root / 'build' / 'sony-open-pmca-version'
 versionDir.mkdir(parents=True, exist_ok=True)
 (versionDir / 'frozenversion.py').write_text('version = %r\n' % version)
 
@@ -31,8 +31,8 @@ a = Analysis(
  binaries=[(str(Path(libusb).resolve()), '.')],
  datas=[
   (str(root / 'certs/localtest.me.pem'), 'certs'),
-  (str(root / 'assets/sony-a7-pmca.png'), 'assets'),
-  (str(root / 'assets/sony-a7-pmca.svg'), 'assets'),
+  (str(root / 'assets/sony-open-pmca.png'), 'assets'),
+  (str(root / 'assets/sony-open-pmca.svg'), 'assets'),
   (str(root / 'LICENSE.txt'), '.'),
  ],
  hiddenimports=['usb.backend.libusb1', 'frozenversion'],
@@ -42,7 +42,7 @@ pyz = PYZ(a.pure)
 exe = EXE(
  pyz, a.scripts, [],
  exclude_binaries=True,
- name='Sony A7 PMCA',
+ name='Sony Open PMCA',
  console=False,
  strip=False,
  upx=False,
@@ -53,16 +53,16 @@ coll = COLLECT(
  exe, a.binaries, a.datas,
  strip=False,
  upx=False,
- name='Sony A7 PMCA',
+ name='Sony Open PMCA',
 )
 app = BUNDLE(
  coll,
- name='Sony A7 PMCA.app',
- bundle_identifier='org.openpmca.sonya7pmca',
- icon=str(root / 'assets/sony-a7-pmca.icns'),
+ name='Sony Open PMCA.app',
+ bundle_identifier='org.openpmca.sonyopenpmca',
+ icon=str(root / 'assets/sony-open-pmca.icns'),
  version='1.0.0',
  info_plist={
-  'CFBundleDisplayName': 'Sony A7 PMCA',
+  'CFBundleDisplayName': 'Sony Open PMCA',
   'CFBundleShortVersionString': '1.0.0',
   'CFBundleVersion': '1.0.0',
   'NSHighResolutionCapable': True,

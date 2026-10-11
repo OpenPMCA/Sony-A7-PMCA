@@ -459,13 +459,13 @@ class MainUi(UiRoot):
 
   brandFrame = Frame(header)
   brandFrame.pack(side=LEFT)
-  imagePath = os.path.join(scriptRoot, "assets/sony-a7-pmca.png")
+  imagePath = os.path.join(scriptRoot, "assets/sony-open-pmca.png")
   if not os.path.isfile(imagePath):
-   imagePath = os.path.join(scriptRoot, "assets/sony-a7-pmca.png")
+   imagePath = os.path.join(scriptRoot, "assets/sony-open-pmca.png")
   if installerOnly and os.path.isfile(imagePath):
    self.logoImage = PhotoImage(master=self, file=imagePath).subsample(18, 18)
    Label(brandFrame, image=self.logoImage).pack(side=LEFT, padx=(0, 8))
-  Label(brandFrame, text="Sony A7 PMCA", style="Title.TLabel").pack(side=LEFT)
+  Label(brandFrame, text="Sony Open PMCA", style="Title.TLabel").pack(side=LEFT)
   Label(brandFrame, text="v%s" % version, style="Detail.TLabel").pack(side=LEFT, padx=(6, 0))
 
   statusFrame = Frame(header)
@@ -1934,7 +1934,7 @@ def checkRuntime(outFile):
  chain = tlslite.X509CertChain()
  chain.parsePemList(pem)
  key = tlslite.parsePEMKey(pem, private=True)
- sample = b'Sony A7 PMCA runtime check'
+ sample = b'Sony Open PMCA runtime check'
  result = {
   'version': version or '1.0.0',
   'python': platform.python_version(),
@@ -1975,7 +1975,7 @@ def main():
   checkCamera(sys.argv[2])
   return
  installerOnly = True
- title = 'Sony A7 PMCA'
+ title = 'Sony Open PMCA'
  ui = MainUi(title + (' ' + version if version else ''), installerOnly=installerOnly)
  ui.mainloop()
 

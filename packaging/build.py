@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sony A7 PMCA desktop distribution and packaging CLI.
+"""Sony Open PMCA desktop distribution and packaging CLI.
 
 Actions:
   build: Run PyInstaller for the native platform.
@@ -61,16 +61,16 @@ def get_asset_name(os_name: str, version: str = "1.0.0", arch: str = None) -> st
     os_lower = os_name.lower()
     if "darwin" in os_lower or "mac" in os_lower:
         target_arch = arch or "arm64"
-        return f"Sony-A7-PMCA-{version}-macos-{target_arch}.zip"
+        return f"Sony-Open-PMCA-{version}-macos-{target_arch}.zip"
     elif "win" in os_lower:
         target_arch = arch or "x64"
-        return f"Sony-A7-PMCA-{version}-windows-{target_arch}.exe"
+        return f"Sony-Open-PMCA-{version}-windows-{target_arch}.exe"
     elif "linux" in os_lower:
         target_arch = arch or "x86_64"
-        return f"Sony-A7-PMCA-{version}-linux-{target_arch}.AppImage"
+        return f"Sony-Open-PMCA-{version}-linux-{target_arch}.AppImage"
     else:
         target_arch = arch or "unknown"
-        return f"Sony-A7-PMCA-{version}-{os_lower}-{target_arch}.bin"
+        return f"Sony-Open-PMCA-{version}-{os_lower}-{target_arch}.bin"
 
 
 def get_apprun_content() -> str:
@@ -86,12 +86,12 @@ export LD_LIBRARY_PATH="$APPDIR/usr/lib:$APPDIR/usr/lib/x86_64-linux-gnu:$APPDIR
 export PATH="$APPDIR/usr/bin:$APPDIR${PATH:+:$PATH}"
 
 # Run frozen binary, forwarding all arguments quoted
-if [ -x "$APPDIR/usr/bin/Sony-A7-PMCA" ]; then
-    exec "$APPDIR/usr/bin/Sony-A7-PMCA" "$@"
-elif [ -x "$APPDIR/Sony-A7-PMCA" ]; then
-    exec "$APPDIR/Sony-A7-PMCA" "$@"
+if [ -x "$APPDIR/usr/bin/Sony-Open-PMCA" ]; then
+    exec "$APPDIR/usr/bin/Sony-Open-PMCA" "$@"
+elif [ -x "$APPDIR/Sony-Open-PMCA" ]; then
+    exec "$APPDIR/Sony-Open-PMCA" "$@"
 else
-    echo "Error: Sony-A7-PMCA binary not found in AppDir" >&2
+    echo "Error: Sony-Open-PMCA binary not found in AppDir" >&2
     exit 1
 fi
 """
@@ -239,7 +239,7 @@ def validate_runtime_report(
 
 def get_macos_minimum(app_path: Path) -> str:
     """Read the highest macOS deployment target among bundled native dependencies."""
-    binary = app_path / 'Contents' / 'MacOS' / 'Sony A7 PMCA'
+    binary = app_path / 'Contents' / 'MacOS' / 'Sony Open PMCA'
     versions = []
     seen = set()
     for path in app_path.rglob('*'):
@@ -269,7 +269,7 @@ def get_macos_minimum(app_path: Path) -> str:
 
 
 def render_cask(version: str = "1.0.0", sha256_hex: str = "", min_macos: str = "11.0") -> str:
-    """Render Homebrew cask Ruby definition for Sony A7 PMCA."""
+    """Render Homebrew cask Ruby definition for Sony Open PMCA."""
     if not sha256_hex or len(sha256_hex) != 64:
         raise ValueError("Valid 64-character SHA-256 checksum is required for Homebrew cask")
     releases = {'11': 'big_sur', '12': 'monterey', '13': 'ventura',
@@ -277,22 +277,22 @@ def render_cask(version: str = "1.0.0", sha256_hex: str = "", min_macos: str = "
     major = min_macos.split('.')[0]
     if major not in releases:
         raise ValueError('Unknown minimum macOS version: %s' % min_macos)
-    return f"""cask "sony-a7-pmca" do
+    return f"""cask "sony-open-pmca" do
   version "{version}"
   sha256 "{sha256_hex}"
 
-  url "https://github.com/OpenPMCA/Sony-A7-PMCA/releases/download/v#{{version}}/Sony-A7-PMCA-#{{version}}-macos-arm64.zip"
-  name "Sony A7 PMCA"
+  url "https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v#{{version}}/Sony-Open-PMCA-#{{version}}-macos-arm64.zip"
+  name "Sony Open PMCA"
   desc "GUI application to manage apps on Sony Alpha cameras"
-  homepage "https://github.com/OpenPMCA/Sony-A7-PMCA"
+  homepage "https://github.com/OpenPMCA/Sony-Open-PMCA"
 
   depends_on arch: :arm64
   depends_on macos: :{releases[major]}
 
-  app "Sony A7 PMCA.app"
+  app "Sony Open PMCA.app"
 
   zap trash: [
-    "~/Library/Saved Application State/org.openpmca.sonya7pmca.savedState",
+    "~/Library/Saved Application State/org.openpmca.sonyopenpmca.savedState",
   ]
 end
 """
@@ -311,13 +311,13 @@ def package_macos(app_path: Path = None, out_dir: Path = None, version: str = No
     """Package existing macOS .app bundle into deterministic ARM64 ZIP and generate Cask."""
     ver = version or get_version()
     dist_dir = out_dir or (REPO_ROOT / "dist")
-    target_app = app_path or (dist_dir / "Sony A7 PMCA.app")
+    target_app = app_path or (dist_dir / "Sony Open PMCA.app")
 
     if not target_app.exists():
         raise FileNotFoundError(f"macOS app bundle not found at {target_app}")
 
     # Verify architecture is ARM64
-    bin_path = target_app / "Contents" / "MacOS" / "Sony A7 PMCA"
+    bin_path = target_app / "Contents" / "MacOS" / "Sony Open PMCA"
     file_out = subprocess.check_output(["file", str(bin_path)]).decode("utf-8")
     if "arm64" not in file_out.lower():
         raise RuntimeError(f"macOS binary is not ARM64: {file_out}")
@@ -336,10 +336,10 @@ def package_macos(app_path: Path = None, out_dir: Path = None, version: str = No
 
     sha256_hex = compute_sha256(zip_path)
 
-    # Render and write Casks/sony-a7-pmca.rb
+    # Render and write Casks/sony-open-pmca.rb
     cask_dir = REPO_ROOT / "Casks"
     cask_dir.mkdir(parents=True, exist_ok=True)
-    cask_file = cask_dir / "sony-a7-pmca.rb"
+    cask_file = cask_dir / "sony-open-pmca.rb"
     cask_content = render_cask(version=ver, sha256_hex=sha256_hex, min_macos=get_macos_minimum(target_app))
     cask_file.write_text(cask_content, encoding="utf-8")
 
@@ -375,11 +375,11 @@ def package_linux_appimage(
     """Assemble Linux AppDir and create AppImage."""
     ver = version or get_version()
     d_dir = dist_dir or (REPO_ROOT / "dist")
-    binary_dir = d_dir / "Sony-A7-PMCA"
+    binary_dir = d_dir / "Sony-Open-PMCA"
     if not binary_dir.exists():
         raise FileNotFoundError(f"Linux binary directory not found at {binary_dir}")
 
-    appdir = d_dir / "Sony-A7-PMCA.AppDir"
+    appdir = d_dir / "Sony-Open-PMCA.AppDir"
     if appdir.exists():
         shutil.rmtree(appdir)
     appdir.mkdir(parents=True, exist_ok=True)
@@ -393,13 +393,13 @@ def package_linux_appimage(
     apprun.chmod(0o755)
 
     # Install Desktop Entry
-    desktop_src = REPO_ROOT / "packaging" / "linux" / "sony-a7-pmca.desktop"
-    shutil.copy2(desktop_src, appdir / "sony-a7-pmca.desktop")
+    desktop_src = REPO_ROOT / "packaging" / "linux" / "sony-open-pmca.desktop"
+    shutil.copy2(desktop_src, appdir / "sony-open-pmca.desktop")
 
     # Install Icon
-    icon_src = REPO_ROOT / "assets" / "sony-a7-pmca.png"
+    icon_src = REPO_ROOT / "assets" / "sony-open-pmca.png"
     if icon_src.exists():
-        shutil.copy2(icon_src, appdir / "sony-a7-pmca.png")
+        shutil.copy2(icon_src, appdir / "sony-open-pmca.png")
         shutil.copy2(icon_src, appdir / ".DirIcon")
 
     # Run appimagetool
@@ -428,7 +428,7 @@ def package_windows_exe(dist_dir: Path = None, version: str = None) -> dict:
     """Verify and rename Windows one-file EXE to canonical versioned asset name."""
     ver = version or get_version()
     d_dir = dist_dir or (REPO_ROOT / "dist")
-    exe_src = d_dir / "Sony-A7-PMCA.exe"
+    exe_src = d_dir / "Sony-Open-PMCA.exe"
     if not exe_src.exists():
         raise FileNotFoundError(f"Windows EXE not found at {exe_src}")
 
@@ -475,7 +475,7 @@ def run_verify(executable_path: Path, expected_arch: str = None) -> int:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sony A7 PMCA Packaging CLI")
+    parser = argparse.ArgumentParser(description="Sony Open PMCA Packaging CLI")
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     # Build action
@@ -498,7 +498,7 @@ def main():
         spec = args.spec
         if not spec:
             if sys.platform == "darwin":
-                spec = str(REPO_ROOT / "sony-a7-pmca.spec")
+                spec = str(REPO_ROOT / "sony-open-pmca.spec")
             else:
                 spec = str(REPO_ROOT / "packaging" / "desktop.spec")
         subprocess.check_call([sys.executable, "-m", "PyInstaller", spec])
@@ -534,7 +534,7 @@ def main():
             sys.exit(code)
         else:
             if sys.platform == "darwin":
-                exe = REPO_ROOT / "dist" / "Sony A7 PMCA.app" / "Contents" / "MacOS" / "Sony A7 PMCA"
+                exe = REPO_ROOT / "dist" / "Sony Open PMCA.app" / "Contents" / "MacOS" / "Sony Open PMCA"
                 code = run_verify(exe, expected_arch="arm64")
                 sys.exit(code)
             else:

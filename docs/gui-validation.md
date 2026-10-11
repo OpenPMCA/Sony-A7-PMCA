@@ -2,8 +2,8 @@
 
 ## Architecture & Implementation Overview
 
-- **ARM64 macOS app bundle** (`dist/Sony A7 PMCA.app`) bundling Python 3.14.8, Tcl 9.1.0, libusb 1.0.30, and the installation certificate.
-- **Single Source of Truth Versioning**: Synchronized version `1.0.0` across `pmca.__version__`, `pmca-console.py`, `pmca-gui.py`, `sony-a7-pmca.spec` (`CFBundleShortVersionString`/`CFBundleVersion`), and runtime diagnostics.
+- **ARM64 macOS app bundle** (`dist/Sony Open PMCA.app`) bundling Python 3.14.8, Tcl 9.1.0, libusb 1.0.30, and the installation certificate.
+- **Single Source of Truth Versioning**: Synchronized version `1.0.0` across `pmca.__version__`, `pmca-console.py`, `pmca-gui.py`, `sony-open-pmca.spec` (`CFBundleShortVersionString`/`CFBundleVersion`), and runtime diagnostics.
 - **Streamlined Navigation (layout-spec.md)**:
   - Header (54px): Brand title, Sony Alpha mark, and real-time automatic connection status ("● Connected: {name} (MTP)" / "○ Camera Disconnected").
   - Sidebar (156px): Exactly 3 navigation items (`Info`, `Application`, `Logs`) with quiet active indicators.
@@ -61,7 +61,7 @@
 - Native macOS trackpad scrolling verified via `<TouchpadScroll>` signed 16-bit delta unpacking per Tk 9.1 spec (`tk::PreciseScrollDeltas`), pixel-accurate `yscrollincrement=1`, and `'StoreScrollable'` bindtag routing across all child widgets.
 
 ### 5. Frozen App Bundle Validation
-- Executable runtime check (`"dist/Sony A7 PMCA.app/Contents/MacOS/Sony A7 PMCA" --check-runtime`):
+- Executable runtime check (`"dist/Sony Open PMCA.app/Contents/MacOS/Sony Open PMCA" --check-runtime`):
   - `version`: "1.0.0"
   - `frozen`: true
   - `architecture`: arm64
@@ -73,6 +73,6 @@
   - `tls_handshake_verified`: true (tested loopback TLS 1.2 CBC with AES256-SHA)
   - `tls_cipher`: "AES256-SHA"
   - `tls_version`: "TLSv1.2"
-- Code signing verified: `codesign --verify --deep --strict "dist/Sony A7 PMCA.app"`.
+- Code signing verified: `codesign --verify --deep --strict "dist/Sony Open PMCA.app"`.
 
 No git commit, push, release publication, live camera write, or firmware alteration has been performed.

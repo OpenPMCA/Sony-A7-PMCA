@@ -14,7 +14,7 @@ if str(root) not in sys.path:
 
 from pmca import __version__ as version
 
-versionDir = root / 'build' / 'sony-a7-pmca-version'
+versionDir = root / 'build' / 'sony-open-pmca-version'
 versionDir.mkdir(parents=True, exist_ok=True)
 (versionDir / 'frozenversion.py').write_text('version = %r\n' % version)
 
@@ -80,7 +80,7 @@ def find_libusb():
     else:
         raise RuntimeError(
             'packaging/desktop.spec is designed for Windows and Linux.\n'
-            'On macOS, reuse sony-a7-pmca.spec.'
+            'On macOS, reuse sony-open-pmca.spec.'
         )
 
 
@@ -89,8 +89,8 @@ libusb_bin = find_libusb()
 # Common data files
 datas = [
     (str(root / 'certs' / 'localtest.me.pem'), 'certs'),
-    (str(root / 'assets' / 'sony-a7-pmca.png'), 'assets'),
-    (str(root / 'assets' / 'sony-a7-pmca.svg'), 'assets'),
+    (str(root / 'assets' / 'sony-open-pmca.png'), 'assets'),
+    (str(root / 'assets' / 'sony-open-pmca.svg'), 'assets'),
     (str(root / 'LICENSE.txt'), '.'),
 ]
 
@@ -108,7 +108,7 @@ if sys.platform == 'win32':
         'win32com.client',
     ]
     excludes = ['pmca.usb.driver.osx']
-    icon_file = root / 'assets' / 'sony-a7-pmca.ico'
+    icon_file = root / 'assets' / 'sony-open-pmca.ico'
     app_icon = str(icon_file) if icon_file.exists() else None
 
     a = Analysis(
@@ -127,7 +127,7 @@ if sys.platform == 'win32':
         a.binaries,
         a.datas,
         [],
-        name='Sony-A7-PMCA',
+        name='Sony-Open-PMCA',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -136,7 +136,7 @@ if sys.platform == 'win32':
         icon=app_icon,
     )
 elif sys.platform.startswith('linux'):
-    datas.append((str(root / 'packaging' / 'linux' / 'sony-a7-pmca.desktop'), '.'))
+    datas.append((str(root / 'packaging' / 'linux' / 'sony-open-pmca.desktop'), '.'))
     hiddenimports = ['usb.backend.libusb1', 'frozenversion']
     excludes = ['pmca.usb.driver.windows', 'pmca.usb.driver.osx']
 
@@ -155,7 +155,7 @@ elif sys.platform.startswith('linux'):
         a.scripts,
         [],
         exclude_binaries=True,
-        name='Sony-A7-PMCA',
+        name='Sony-Open-PMCA',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -168,5 +168,5 @@ elif sys.platform.startswith('linux'):
         a.datas,
         strip=False,
         upx=False,
-        name='Sony-A7-PMCA',
+        name='Sony-Open-PMCA',
     )

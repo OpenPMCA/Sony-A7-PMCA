@@ -5,7 +5,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: CommandLine.arguments[1])
-let iconset = root.appendingPathComponent("build/sony-a7-pmca.iconset")
+let iconset = root.appendingPathComponent("build/sony-open-pmca.iconset")
 try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 func color(_ hex: UInt32) -> CGColor {
@@ -47,7 +47,7 @@ func render(_ size: Int, _ output: URL) {
     CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
     precondition(CGImageDestinationFinalize(dest), "Cannot write icon")
 }
-render(1024, root.appendingPathComponent("assets/sony-a7-pmca.png"))
+render(1024, root.appendingPathComponent("assets/sony-open-pmca.png"))
 for size in [16,32,128,256,512] {
     render(size, iconset.appendingPathComponent("icon_\(size)x\(size).png"))
     render(size*2, iconset.appendingPathComponent("icon_\(size)x\(size)@2x.png"))

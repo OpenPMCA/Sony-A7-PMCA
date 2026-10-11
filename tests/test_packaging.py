@@ -9,8 +9,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_SCRIPT = REPO_ROOT / "packaging" / "build.py"
-DESKTOP_ENTRY = REPO_ROOT / "packaging" / "linux" / "sony-a7-pmca.desktop"
-CASK_PATH = REPO_ROOT / "Casks" / "sony-a7-pmca.rb"
+DESKTOP_ENTRY = REPO_ROOT / "packaging" / "linux" / "sony-open-pmca.desktop"
+CASK_PATH = REPO_ROOT / "Casks" / "sony-open-pmca.rb"
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build.yml"
 
 
@@ -29,15 +29,15 @@ class PackagingFilenamesTest(unittest.TestCase):
         mod = load_build_module()
         self.assertEqual(
             mod.get_asset_name("macos", version="1.0.0", arch="arm64"),
-            "Sony-A7-PMCA-1.0.0-macos-arm64.zip",
+            "Sony-Open-PMCA-1.0.0-macos-arm64.zip",
         )
         self.assertEqual(
             mod.get_asset_name("windows", version="1.0.0", arch="x64"),
-            "Sony-A7-PMCA-1.0.0-windows-x64.exe",
+            "Sony-Open-PMCA-1.0.0-windows-x64.exe",
         )
         self.assertEqual(
             mod.get_asset_name("linux", version="1.0.0", arch="x86_64"),
-            "Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage",
+            "Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage",
         )
 
     def test_apprun_argument_forwarding_quoted(self):
@@ -57,9 +57,9 @@ class DesktopFileTest(unittest.TestCase):
         self.assertTrue(DESKTOP_ENTRY.exists(), f"Desktop file missing at {DESKTOP_ENTRY}")
         content = DESKTOP_ENTRY.read_text(encoding="utf-8")
         self.assertTrue(content.startswith("[Desktop Entry]"))
-        self.assertIn("Name=Sony A7 PMCA", content)
-        self.assertIn("Exec=Sony-A7-PMCA", content)
-        self.assertIn("Icon=sony-a7-pmca", content)
+        self.assertIn("Name=Sony Open PMCA", content)
+        self.assertIn("Exec=Sony-Open-PMCA", content)
+        self.assertIn("Icon=sony-open-pmca", content)
         self.assertIn("Terminal=false", content)
         self.assertIn("Type=Application", content)
 
@@ -148,13 +148,13 @@ class HomebrewCaskTest(unittest.TestCase):
     def test_cask_content_and_restrictions(self):
         self.assertTrue(CASK_PATH.exists(), f"Cask file missing at {CASK_PATH}")
         content = CASK_PATH.read_text(encoding="utf-8")
-        self.assertIn('cask "sony-a7-pmca"', content)
+        self.assertIn('cask "sony-open-pmca"', content)
         self.assertIn('version "1.0.0"', content)
         self.assertNotIn(":no_check", content, "Cask must not use :no_check")
         self.assertIn("depends_on arch: :arm64", content, "Cask must restrict to arm64")
-        self.assertIn('app "Sony A7 PMCA.app"', content)
-        self.assertIn("https://github.com/OpenPMCA/Sony-A7-PMCA/releases/download/v", content)
-        self.assertIn("Sony-A7-PMCA-", content)
+        self.assertIn('app "Sony Open PMCA.app"', content)
+        self.assertIn("https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v", content)
+        self.assertIn("Sony-Open-PMCA-", content)
         self.assertIn("-macos-arm64.zip", content)
 
         # Checksum must be 64-char hex
@@ -162,7 +162,7 @@ class HomebrewCaskTest(unittest.TestCase):
         self.assertIsNotNone(match, "Cask must specify a valid 64-character SHA-256 checksum")
 
     def test_cask_checksum_matches_actual_mac_zip_if_present(self):
-        zip_file = REPO_ROOT / "dist" / "Sony-A7-PMCA-1.0.0-macos-arm64.zip"
+        zip_file = REPO_ROOT / "dist" / "Sony-Open-PMCA-1.0.0-macos-arm64.zip"
         if zip_file.exists():
             content = CASK_PATH.read_text(encoding="utf-8")
             match = re.search(r'sha256\s+"([0-9a-fA-F]{64})"', content)

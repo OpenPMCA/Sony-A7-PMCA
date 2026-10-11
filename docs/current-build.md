@@ -1,8 +1,8 @@
-# Current Sony A7 PMCA build (Version 1.0.0)
+# Current Sony Open PMCA build (Version 1.0.0)
 
 There is one retained production-style app bundle:
 
-`dist/Sony A7 PMCA.app`
+`dist/Sony Open PMCA.app`
 
 Older project app bundles (`v2`, `v2-safe`, separate preview folder), standalone executable copies, archives, and generated build intermediates were removed on 2026-10-10 at the user's request. The inspected legacy `/Applications/pmca-gui-v0.18-osx.app` was also removed; no camera drivers or unrelated applications were changed. Source code, tests, selected SVG/artwork, and the original RecipeLab APK are preserved.
 

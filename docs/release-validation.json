@@ -85,8 +85,8 @@
     "all_equal": true
   },
   "macos": {
-    "asset": "dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip",
-    "sha256": "5c06c399066dafdd6e566b3b258d02f1434e30d3f4934d4f27fd1bf43beec433",
+    "asset": "dist/Sony-Open-PMCA-1.0.0-macos-arm64.zip",
+    "sha256": "a042f55f9e32f8b6d05d69c501c70bdbf99f35c40735d00fb633520961913f87",
     "minimum_os": "27.0",
     "architecture": "arm64",
     "tls_cipher": "AES256-SHA",

@@ -86,7 +86,7 @@ class StandaloneLibraryTest(unittest.TestCase):
   build = module(ROOT / 'packaging/build.py', 'mac_minimum_test')
   with TemporaryDirectory() as directory:
    app = Path(directory)
-   binary = app / 'Contents/MacOS/Sony A7 PMCA'
+   binary = app / 'Contents/MacOS/Sony Open PMCA'
    library = app / 'Contents/Frameworks/libtcl9.1.dylib'
    binary.parent.mkdir(parents=True); library.parent.mkdir(parents=True)
    binary.write_bytes(b'bootloader'); library.write_bytes(b'framework')

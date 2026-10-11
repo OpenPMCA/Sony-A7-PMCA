@@ -1,4 +1,4 @@
-# Sony A7 PMCA on macOS
+# Sony Open PMCA on macOS
 
 RecipeLab runs on the camera's Android platform, not on macOS. PMCA runs on the Mac and transfers the APK through Sony's app-install protocol. Copying an APK onto a memory card does not install it.
 
@@ -17,9 +17,9 @@ The camera is currently charging; physical tests are paused. See [validation res
 
 ## Open the delivered preview
 
-The preview from this session is at `dist/Sony A7 PMCA.app`.
+The preview from this session is at `dist/Sony Open PMCA.app`.
 
-1. Quit any still-running older Sony A7 PMCA instance. Older on-disk app bundles have been removed, but a process already running can still display its old window.
+1. Quit any still-running older Sony Open PMCA instance. Older on-disk app bundles have been removed, but a process already running can still display its old window.
 2. Open the preview app in Finder. You do not need to connect a camera for GUI/download testing.
 3. In **Applications**, choose a local `RecipeLab.apk` or click **Download RecipeLab…** and choose where to save it.
 4. Read package/version/SDK details and download status. Downloading does not install anything.
@@ -64,7 +64,7 @@ sh assets/make-icons.sh
 Build the preview in a separate directory:
 
 ```bash
-.venv/bin/python -m PyInstaller --distpath dist sony-a7-pmca.spec
+.venv/bin/python -m PyInstaller --distpath dist sony-open-pmca.spec
 ```
 
 Python/Tcl/Tk, libusb, the installation certificate, artwork, and upstream license are bundled. The built app does not require a separate Python installation.
@@ -80,7 +80,7 @@ Full suite, with no network or camera operations:
 Actual frozen executable, without opening a window or enumerating USB:
 
 ```bash
-"dist/Sony A7 PMCA.app/Contents/MacOS/Sony A7 PMCA" --check-runtime "$PWD/dist/runtime-check.json"
+"dist/Sony Open PMCA.app/Contents/MacOS/Sony Open PMCA" --check-runtime "$PWD/dist/runtime-check.json"
 ```
 
 The JSON should report `frozen: true`, `architecture: arm64`, Tcl's version, successful libusb loading, SPK round-trip, and certificate/key parsing. Its libusb path should point inside this bundle. This is not proof of live camera access.

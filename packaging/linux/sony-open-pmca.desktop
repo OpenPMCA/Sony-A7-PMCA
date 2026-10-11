@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Sony A7 PMCA
+Name=Sony Open PMCA
 Comment=Manage and install applications on Sony Alpha cameras
-Exec=Sony-A7-PMCA %F
-Icon=sony-a7-pmca
+Exec=Sony-Open-PMCA %F
+Icon=sony-open-pmca
 Terminal=false
 Categories=Utility;HardwareSettings;
 StartupNotify=true
-StartupWMClass=Sony A7 PMCA
+StartupWMClass=Sony Open PMCA

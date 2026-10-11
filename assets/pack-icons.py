@@ -4,7 +4,7 @@ import struct
 import sys
 
 root = Path(sys.argv[1])
-iconset = root / 'build/sony-a7-pmca.iconset'
+iconset = root / 'build/sony-open-pmca.iconset'
 representations = [
  (b'icp4', 'icon_16x16.png', 16),
  (b'icp5', 'icon_32x32.png', 32),
@@ -25,5 +25,5 @@ for kind, filename, size in representations:
   raise ValueError('Invalid icon representation: %s' % filename)
  chunks.append(kind + struct.pack('>I', len(data) + 8) + data)
 payload = b''.join(chunks)
-(root / 'assets/sony-a7-pmca.icns').write_bytes(b'icns' + struct.pack('>I', len(payload) + 8) + payload)
+(root / 'assets/sony-open-pmca.icns').write_bytes(b'icns' + struct.pack('>I', len(payload) + 8) + payload)
 print('Created ICNS with %d PNG representations' % len(chunks))

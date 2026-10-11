@@ -40,11 +40,11 @@ jobs:
 
       - name: Build macOS bundle
         run: |
-          python packaging/build.py build --spec sony-a7-pmca.spec
+          python packaging/build.py build --spec sony-open-pmca.spec
 
       - name: Verify frozen runtime
         run: |
-          "dist/Sony A7 PMCA.app/Contents/MacOS/Sony A7 PMCA" --check-runtime dist/runtime-check.json
+          "dist/Sony Open PMCA.app/Contents/MacOS/Sony Open PMCA" --check-runtime dist/runtime-check.json
           python packaging/build.py verify --report dist/runtime-check.json --arch arm64
 
       - name: Package macOS distribution archive and Cask
@@ -53,16 +53,16 @@ jobs:
 
       - name: Verify Homebrew Cask syntax
         run: |
-          ruby -c Casks/sony-a7-pmca.rb
+          ruby -c Casks/sony-open-pmca.rb
 
       - name: Upload macOS distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-A7-PMCA-1.0.0-macos-arm64
+          name: Sony-Open-PMCA-1.0.0-macos-arm64
           path: |
-            dist/Sony-A7-PMCA-1.0.0-macos-arm64.zip
+            dist/Sony-Open-PMCA-1.0.0-macos-arm64.zip
             dist/runtime-check.json
-            Casks/sony-a7-pmca.rb
+            Casks/sony-open-pmca.rb
           if-no-files-found: error
 
   build-windows:
@@ -107,14 +107,14 @@ jobs:
       - name: Verify frozen runtime
         shell: pwsh
         run: |
-          python packaging/build.py verify --executable "dist\Sony-A7-PMCA-1.0.0-windows-x64.exe" --arch x64
+          python packaging/build.py verify --executable "dist\Sony-Open-PMCA-1.0.0-windows-x64.exe" --arch x64
 
       - name: Upload Windows distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-A7-PMCA-1.0.0-windows-x64
+          name: Sony-Open-PMCA-1.0.0-windows-x64
           path: |
-            dist/Sony-A7-PMCA-1.0.0-windows-x64.exe
+            dist/Sony-Open-PMCA-1.0.0-windows-x64.exe
             dist/runtime-check.json
           if-no-files-found: error
 
@@ -154,7 +154,7 @@ jobs:
 
       - name: Verify frozen runtime under Xvfb
         run: |
-          xvfb-run -a dist/Sony-A7-PMCA/Sony-A7-PMCA --check-runtime dist/runtime-check.json
+          xvfb-run -a dist/Sony-Open-PMCA/Sony-Open-PMCA --check-runtime dist/runtime-check.json
           python packaging/build.py verify --report dist/runtime-check.json --arch x64
 
       - name: Package Linux AppImage
@@ -165,13 +165,13 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
-          xvfb-run -a python packaging/build.py verify --executable dist/Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
+          xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
 
       - name: Upload Linux distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-A7-PMCA-1.0.0-linux-x86_64
+          name: Sony-Open-PMCA-1.0.0-linux-x86_64
           path: |
-            dist/Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage
+            dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage
             dist/runtime-check.json
           if-no-files-found: error

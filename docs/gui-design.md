@@ -1,4 +1,4 @@
-# Sony A7 PMCA GUI direction
+# Sony Open PMCA GUI direction
 
 This is a redesign of the existing Tk desktop utility, not a web page or a new GUI framework. The audience is the camera owner; the current job is safe camera inspection and deliberate camera-app download/installation.
 

@@ -176,8 +176,8 @@ if __name__ == '__main__':
 
 class ConsoleBrandingTest(unittest.TestCase):
  def test_console_cli_branding_uses_sony_a7_pmca(self):
-  """Verify pmca-console.py uses Sony A7 PMCA program name and description."""
+  """Verify pmca-console.py uses Sony Open PMCA program name and description."""
   import subprocess
   cmd = [sys.executable, str(Path(repo_root) / 'pmca-console.py'), '--help']
   out = subprocess.check_output(cmd).decode('utf-8')
-  self.assertIn('Sony A7 PMCA', out)
+  self.assertIn('Sony Open PMCA', out)

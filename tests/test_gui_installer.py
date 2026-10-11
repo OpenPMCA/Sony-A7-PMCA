@@ -251,7 +251,7 @@ class GuiInstallerTest(unittest.TestCase):
  def test_runtime_check_writes_report_without_opening_window(self):
   report = Path(self.temp.name) / 'runtime.json'
   window = Mock()
-  with patch('sys.argv', ['Sony A7 PMCA', '--check-runtime', str(report)]), \
+  with patch('sys.argv', ['Sony Open PMCA', '--check-runtime', str(report)]), \
        patch.dict(self.gui, {'MainUi': window}):
    self.gui['main']()
   window.assert_not_called()
@@ -278,7 +278,7 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('sys.platform', 'darwin'), patch.dict(self.gui, {'MainUi': window}):
    self.gui['main']()
   self.assertTrue(window.call_args.kwargs.get('installerOnly'))
-  self.assertTrue(window.call_args.args[0].startswith('Sony A7 PMCA'))
+  self.assertTrue(window.call_args.args[0].startswith('Sony Open PMCA'))
   window.return_value.mainloop.assert_called_once()
 
 

@@ -1,6 +1,6 @@
 # Testing status
 
-Project: Sony A7 PMCA. Version: 1.0.0. Verification date: 2026-10-11.
+Project: Sony Open PMCA. Version: 1.0.0. Verification date: 2026-10-11.
 
 This document separates automated tests, native runtime checks and actual camera operations. GitHub workflow configuration is not evidence that its jobs have finished successfully.
 
@@ -14,8 +14,8 @@ This document separates automated tests, native runtime checks and actual camera
 | Apple Silicon frozen runtime | Pre-migration archive passed libusb/Tcl/certificate/encryption/TLS, code-tree parity and deep/strict ad-hoc signature checks. The renamed archive is reverified separately. | Required local dependencies and encrypted loopback exchange worked on the test host. | Apple notarization or older-macOS compatibility. |
 | Camera installation | RecipeLab installation on Sony ILCE-7 completed with camera result code 0 and user confirmation. | That selected transfer succeeded on the tested body. | Other app installs or Windows/Linux camera operations. |
 | Shutter metadata | Decoder, flash/rollover and bounded MTP contracts tested with fixtures/reference data. | Covered decoder behavior and honest unavailable/ambiguous states. | A current physical-camera count; the camera was disconnected for final verification. |
-| Windows EXE | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/runs/38108354284)). | Native 64-bit Windows build, PyInstaller one-file packaging, and `--check-runtime` frozen diagnostic executed and passed on `windows-2022`. | Physical camera communication over Windows WPD driver in production. |
-| Linux AppImage | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/runs/38108354284)). | Native Linux build, Xvfb GUI smoke test, `appimagetool` packaging, and final `.AppImage` `--check-runtime` execution passed on `ubuntu-22.04`. | Physical camera communication over Linux libusb in production. |
+| Windows EXE | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284)). | Native 64-bit Windows build, PyInstaller one-file packaging, and `--check-runtime` frozen diagnostic executed and passed on `windows-2022`. | Physical camera communication over Windows WPD driver in production. |
+| Linux AppImage | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38108354284)). | Native Linux build, Xvfb GUI smoke test, `appimagetool` packaging, and final `.AppImage` `--check-runtime` execution passed on `ubuntu-22.04`. | Physical camera communication over Linux libusb in production. |
 
 ## Reproduce local verification
 
@@ -30,18 +30,18 @@ For native bundles, use the packaging verifier to wait for the process and valid
 
 ```sh
 # Apple Silicon macOS
-python packaging/build.py verify --executable 'dist/Sony A7 PMCA.app/Contents/MacOS/Sony A7 PMCA' --arch arm64
+python packaging/build.py verify --executable 'dist/Sony Open PMCA.app/Contents/MacOS/Sony Open PMCA' --arch arm64
 
 # Windows x64
-python packaging/build.py verify --executable 'dist/Sony-A7-PMCA-1.0.0-windows-x64.exe' --arch x64
+python packaging/build.py verify --executable 'dist/Sony-Open-PMCA-1.0.0-windows-x64.exe' --arch x64
 
 # Linux x86_64, testing the final AppImage rather than only its unpackaged binary
-APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python packaging/build.py verify --executable dist/Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
+APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
 ```
 
 ## CI and durable evidence
 
-- [Native build/test workflow](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/workflows/build.yml).
+- [Native build/test workflow](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml).
 - [Actual catalog download evidence](appstore-download-validation.json).
 - [Machine-readable local release validation](release-validation.json).
 - [Release readiness and remaining gates](release-readiness.md).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sony A7 PMCA: Command line application to install apps on Android-enabled Sony cameras"""
+"""Sony Open PMCA: Command line application to install apps on Android-enabled Sony cameras"""
 import argparse
 
 from pmca.commands.backup import *
@@ -14,7 +14,7 @@ else:
 
 def main():
  """Command line main"""
- parser = argparse.ArgumentParser(prog="Sony A7 PMCA", description="Sony A7 PMCA: Command line application to install apps on Android-enabled Sony cameras")
+ parser = argparse.ArgumentParser(prog="Sony Open PMCA", description="Sony Open PMCA: Command line application to install apps on Android-enabled Sony cameras")
  if version:
   parser.add_argument('--version', action='version', version=version)
  drivers = ['native', 'libusb', 'libusb-mtp', 'qemu']
