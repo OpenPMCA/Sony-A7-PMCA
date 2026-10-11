@@ -19,6 +19,26 @@ def module(path, name):
 
 
 class StandaloneLibraryTest(unittest.TestCase):
+ def test_macos_bundle_metadata_follows_current_package_version(self):
+  bundles = []
+  with TemporaryDirectory() as directory:
+   library = Path(directory) / 'libusb-1.0.dylib'
+   library.write_bytes(b'library fixture')
+   with patch('pmca.__version__', '1.1.0'), \
+        patch('ctypes.util.find_library', return_value=str(library)), \
+        patch('sys.platform', 'darwin'):
+    runpy.run_path(str(ROOT / 'sony-open-pmca.spec'), init_globals={
+     'SPECPATH': str(ROOT),
+     'Analysis': lambda *args, **kwargs: SimpleNamespace(pure=[], scripts=[], binaries=[], datas=[]),
+     'PYZ': lambda *args, **kwargs: None,
+     'EXE': lambda *args, **kwargs: None,
+     'COLLECT': lambda *args, **kwargs: None,
+     'BUNDLE': lambda *args, **kwargs: bundles.append(kwargs),
+    })
+  self.assertEqual(bundles[0]['version'], '1.1.0')
+  self.assertEqual(bundles[0]['info_plist']['CFBundleShortVersionString'], '1.1.0')
+  self.assertEqual(bundles[0]['info_plist']['CFBundleVersion'], '1.1.0')
+
  def test_windows_legacy_libusb_does_not_satisfy_libusb1_dependency(self):
   build = module(ROOT / 'packaging/build.py', 'packaging_build_test')
   with TemporaryDirectory() as directory:

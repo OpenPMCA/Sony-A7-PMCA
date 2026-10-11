@@ -8,12 +8,12 @@ This document separates automated tests, native runtime checks and actual camera
 
 | Area | Recorded result | What this proves | What it does not prove |
 |---|---|---|---|
-| Source unit tests | Renamed source and relocated folder baseline: 164 tests passed with ResourceWarning treated as an error. Scroll-performance regressions are rechecked before publication. | Covered parsing, download, cache, transport and GUI contracts. | Uncovered hardware behavior or every model/application combination. |
-| Native Tk GUI | Prior behavior audit: 23 acceptance cases and 8 packed native-scroll cases passed. Rename regression checks are run separately. | Navigation, list reachability, mouse/trackpad event dispatch, busy controls and Logs behavior under controlled providers. | Windows/Linux native appearance before those runners execute. |
+| Source unit tests | Current local camera-support correction: 238 tests passed, no failures/errors/skips, with ResourceWarning treated as an error and four cached real APK fixtures. [Evidence](camera-support-validation.json). | Covered parsing, download, cache, transport and GUI contracts. | Uncovered hardware behavior or every model/application combination. |
+| Native Tk GUI | Current correction: real Tk smoke passed, including simulated unsupported-body and disconnect transitions. Earlier audit also recorded 23 acceptance and 8 packed native-scroll cases. | Navigation, list reachability, mouse/trackpad event dispatch, busy controls and Logs behavior under controlled providers. | Windows/Linux native appearance before those runners execute. |
 | Store APK downloads | 26 actual HTTPS downloads passed package/API/certificate parsing. | The audited sources delivered inspectable APKs with expected identity and compatible declared minimum API. | Cryptographic trust in every publisher or runtime compatibility on every camera. |
-| Apple Silicon frozen runtime | Pre-migration archive passed libusb/Tcl/certificate/encryption/TLS, code-tree parity and deep/strict ad-hoc signature checks. The renamed archive is reverified separately. | Required local dependencies and encrypted loopback exchange worked on the test host. | Apple notarization or older-macOS compatibility. |
+| Apple Silicon frozen runtime | Current isolated candidate passed frozen libusb/Tcl/certificate/SPK/encrypted TLS checks, 47-module whole-code-tree source parity, deep/strict ad-hoc signature, ZIP integrity and runtime/signature after extraction to a fresh path containing spaces. | Required local dependencies and encrypted loopback exchange worked on the test host. | Apple notarization or older-macOS compatibility. |
 | Camera installation | RecipeLab installation on Sony ILCE-7 completed with camera result code 0 and user confirmation. | That selected transfer succeeded on the tested body. | Other app installs or Windows/Linux camera operations. |
-| Shutter metadata | Decoder, flash/rollover and bounded MTP contracts tested with fixtures/reference data. | Covered decoder behavior and honest unavailable/ambiguous states. | A current physical-camera count; the camera was disconnected for final verification. |
+| Shutter metadata | A/B layouts, flash/rollover, model mismatch, capture-date provenance and bounded MTP contracts passed independently built fixtures plus local ExifTool 13.45 comparisons. | Covered decoder behavior and honest unavailable/ambiguous states. | A current physical-camera count; the camera was disconnected for final verification. |
 | Windows EXE | **Passed in CI** ([Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230)). | Native 64-bit Windows build, PyInstaller one-file packaging, and `--check-runtime` frozen diagnostic executed and passed on `windows-2022`. | Physical camera communication over Windows WPD driver in production. |
 | Linux AppImage | **Passed in CI** ([Run 38111647230](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38111647230)). | Native Linux build, Xvfb GUI smoke test, `appimagetool` packaging, and final `.AppImage` `--check-runtime` execution passed on `ubuntu-22.04`. | Physical camera communication over Linux libusb in production. |
 
@@ -44,9 +44,17 @@ APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python packaging/build.py verify --execut
 - [Native build/test workflow](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/workflows/build.yml).
 - [Actual catalog download evidence](appstore-download-validation.json).
 - [Machine-readable local release validation](release-validation.json).
+- [Current camera-support correction validation](camera-support-validation.json).
 - [Release readiness and remaining gates](release-readiness.md).
 
-The initial public migration triggers the native workflow. Status updates must reference that run's actual conclusion and logs; a pending, failed or skipped job must never be described as passed.
+The linked native CI run covers its recorded earlier revision, not the current uncommitted camera-support correction. A pending, failed or skipped job must never be described as passed; this candidate needs a new native Windows/Linux run after an authorized push.
+
+## Current isolated macOS candidate
+
+The camera-support correction was built separately at `dist/camera-support-correction/Sony Open PMCA.app`. Its ZIP is `dist/camera-support-correction/Sony-Open-PMCA-1.0.0-macos-arm64.zip` and SHA-256 is `3af99aae7b73e0ca8220de8e3a05dab42eba5454fc1603defc354a92516d66d1`. It requires macOS 27.0 and uses an ad-hoc signature, not Developer ID/notarization.
+
+A matching candidate Cask is stored beside that ZIP. The previous root `dist` artifacts and tracked `Casks/sony-open-pmca.rb` remain unchanged; this candidate is not published. No physical camera operations or new APK downloads were performed.
+
 
 ## Outstanding release gates
 

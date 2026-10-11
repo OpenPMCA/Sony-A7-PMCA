@@ -45,6 +45,9 @@ class CameraResultTest(unittest.TestCase):
  def test_install_preflights_valid_apk_and_returns_server_result(self):
   """Verify that valid signed APK passes checkApk preflight and returns install result."""
   device = object.__new__(usb.SonyMtpAppInstallDevice)
+  device.getDeviceInfo = Mock(return_value=usb.MtpDeviceInfo(
+   'Sony Corporation', 'ILCE-7', 'fixture-transport',
+   {0x9488, 0x9489, 0x948c, 0x948d}, 'sony.net/SEN_PRXY_MSG:1.0'))
   result = {'deviceinfo': {'name': 'ILCE-7'}}
   with patch.object(usb, 'importDriver', return_value=contextlib.nullcontext(None)), \
        patch.object(usb, 'getDevice', return_value=device), \
@@ -119,6 +122,9 @@ class CameraResultTest(unittest.TestCase):
  def test_install_forwards_optional_progress_callback(self):
   self.assertIn('statusFunc', inspect.signature(usb.installCommand).parameters)
   device = object.__new__(usb.SonyMtpAppInstallDevice)
+  device.getDeviceInfo = Mock(return_value=usb.MtpDeviceInfo(
+   'Sony Corporation', 'ILCE-7', 'fixture-transport',
+   {0x9488, 0x9489, 0x948c, 0x948d}, 'sony.net/SEN_PRXY_MSG:1.0'))
   progress = Mock()
   with patch.object(usb, 'importDriver', return_value=contextlib.nullcontext(None)), \
        patch.object(usb, 'getDevice', return_value=device), \
@@ -151,7 +157,9 @@ class CameraResultTest(unittest.TestCase):
 
  def test_get_read_only_camera_info_on_mtp_does_not_call_updater_init(self):
   device = object.__new__(usb.SonyMtpExtCmdDevice)
-  device.getDeviceInfo = Mock(return_value=SimpleNamespace(version='3.20'))
+  device.getDeviceInfo = Mock(return_value=usb.MtpDeviceInfo(
+   'Sony Corporation', 'ILCE-7', 'fixture-transport',
+   {0x9280, 0x9281, 0x9282}, '', version='3.20'))
   camera = Mock()
   plist_sample = plistlib.dumps({'FirmwareVersion': '3.20'})
   camera.getCameraInfo.return_value = SimpleNamespace(modelName='ILCE-7', modelCode='test-code', serial='test-serial', plist=plist_sample)

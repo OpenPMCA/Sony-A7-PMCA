@@ -1,5 +1,6 @@
 """Unit tests for Sony Alpha shutter counter extraction, deciphering, and MTP integration."""
 import os
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -140,7 +141,8 @@ class ShutterCounterTest(unittest.TestCase):
   self.assertEqual(res['shutter_count'], 43210)
   self.assertEqual(res['date'], "2026:10:11 08:30:00")
 
-  if os.path.exists('/usr/local/bin/exiftool'):
+  exiftool_bin = shutil.which('exiftool') or ('/usr/local/bin/exiftool' if os.path.exists('/usr/local/bin/exiftool') else None)
+  if exiftool_bin:
    with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as f:
     f.write(tiff_data)
     tmp_path = f.name
@@ -154,8 +156,9 @@ class ShutterCounterTest(unittest.TestCase):
 
  def test_extract_shutter_via_exiftool_flash_handling(self):
   """Verify ExifTool JSON parser correctly marks flash fired and ambiguous without positional shift."""
-  if not os.path.exists('/usr/local/bin/exiftool'):
-   return
+  exiftool_bin = shutil.which('exiftool') or ('/usr/local/bin/exiftool' if os.path.exists('/usr/local/bin/exiftool') else None)
+  if not exiftool_bin:
+   self.skipTest("ExifTool reference binary not found in environment for parity assertion")
   tiff_data = make_synthetic_sony_tiff(70000, flash_fired=True)
   with tempfile.NamedTemporaryFile(suffix='.tif', delete=False) as f:
    f.write(tiff_data)
@@ -175,6 +178,7 @@ class ShutterCounterTest(unittest.TestCase):
   mock_mtp = Mock()
   mock_info = Mock()
   mock_info.operationsSupported = {0x1007, 0x101b} # Missing 0x1008
+  mock_info.model = 'ILCE-7'
   mock_mtp.getDeviceInfo.return_value = mock_info
 
   res = query_mtp_camera_shutter_count(mock_mtp)
@@ -186,6 +190,7 @@ class ShutterCounterTest(unittest.TestCase):
   mock_mtp = Mock()
   mock_info = Mock()
   mock_info.operationsSupported = {0x1007, 0x1008, 0x101b}
+  mock_info.model = 'ILCE-7'
   mock_mtp.getDeviceInfo.return_value = mock_info
   mock_mtp.getObjectHandles.return_value = []
 
@@ -222,6 +227,28 @@ class ShutterCounterTest(unittest.TestCase):
   self.assertEqual(res['value'], 55432)
   self.assertFalse(res['flash_fired'])
   self.assertIn("handle 4097", res['provenance'])
+
+ def test_query_mtp_camera_shutter_count_flash_fallback_reason_avoids_lifetime_promise(self):
+  """Verify query_mtp_camera_shutter_count flash guidance does not promise exact lifetime count."""
+  from pmca.usb import PtpObjectInfo
+  mock_mtp = Mock()
+  mock_info = Mock()
+  mock_info.operationsSupported = {0x1007, 0x1008, 0x101b}
+  mock_info.model = 'ILCE-7'
+  mock_mtp.getDeviceInfo.return_value = mock_info
+  mock_mtp.getObjectHandles.return_value = [0x1001]
+  mock_mtp.getObjectInfo.return_value = PtpObjectInfo(1, 0x3801, 1000, 'DSC01001.JPG', '20261011T083000', '20261011T083000')
+
+  tiff_flash = make_synthetic_sony_tiff(70000, flash_fired=True, model='ILCE-7')
+  mock_mtp.getPartialObject.return_value = tiff_flash[:65536]
+
+  res = query_mtp_camera_shutter_count(mock_mtp)
+  self.assertFalse(res['available'])
+  # Must NOT promise 'lifetime' in the returned reason
+  self.assertNotIn("lifetime", res['reason'].lower())
+  # Must explain that the count is as of an examined non-flash image
+  self.assertIn("non-flash", res['reason'].lower())
+  self.assertIn("image", res['reason'].lower())
 
 
 if __name__ == '__main__':
@@ -267,6 +294,7 @@ class ShutterMtpTransportValidationTest(unittest.TestCase):
   mock_mtp = Mock()
   mock_info = Mock()
   mock_info.operationsSupported = {0x1007, 0x1008, 0x101b}
+  mock_info.model = 'ILCE-7'
   mock_mtp.getDeviceInfo.return_value = mock_info
   mock_mtp.getObjectHandles.side_effect = MtpException("Malformed GetObjectHandles response: declared 10 handles")
 

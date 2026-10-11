@@ -157,6 +157,7 @@ class InfoTask(BackgroundTask):
    if not askyesno('Access camera', 'macOS may request permission to capture this camera. This can temporarily disconnect other camera clients.\n\nFinish any photo transfer and close Photos/Image Capture before continuing. This only reads camera information; it does not install an app.'):
     return False
   self.ui.master.setCameraBusy(True)
+  self.captured_session = getattr(self.ui.master, "_cameraSessionId", 0)
   return self.ui.master.driverName
 
  def do(self, driverName):
@@ -179,7 +180,9 @@ class InfoTask(BackgroundTask):
 
  def doAfter(self, result):
   if result:
-   self.ui.showCameraInfo(result[1])
+   current_session = getattr(self.ui.master, "_cameraSessionId", 0)
+   if getattr(self, "captured_session", current_session) == current_session and getattr(self.ui.master, "cameraConnected", True) is not False:
+    self.ui.showCameraInfo(result[1])
    self.ui.master.setCameraBusy(False)
 
 
@@ -188,6 +191,13 @@ class InstallTask(BackgroundTask):
  def doBefore(self):
   if not getattr(self.ui.master, "cameraConnected", True) or not getattr(self.ui.master, "cameraActionsEnabled", True):
    showerror('Cannot install APK', 'Camera is not connected in MTP mode. Connect camera and ensure it is ready.')
+   return
+  if getattr(self.ui.master, "cameraInstallEnabled", None) is False:
+   reason = getattr(self.ui.master, "supportReason", "") or "PMCA app installation is not supported on this camera model."
+   showerror('Cannot install APK', 'Cannot install app on this camera:\n\n%s' % reason)
+   return
+  if getattr(self.ui.master, "cameraBusy", False) or getattr(self.ui.master, "lastReportedBackendBusy", False):
+   showerror('Cannot install APK', 'Camera is currently busy with another operation. Wait for the current operation to finish.')
    return
   mode, apkFilename, app = self.ui.getMode(), self.ui.getSelectedApk(), self.ui.getSelectedApp()
   apkData = None
@@ -204,6 +214,13 @@ class InstallTask(BackgroundTask):
     sdk = apk.getMinSdkVersion()
     if not 1 <= sdk <= 10:
      raise Exception('The camera requires an APK with a minimum Android API between 1 and 10.')
+    cert = None
+    try:
+     cert = apk.getCert()
+    except Exception:
+     cert = None
+    if not cert:
+     raise Exception('The APK signature certificate is missing or invalid.')
    except Exception as e:
     showerror('Cannot install APK', 'Choose a valid camera APK first.\n\n%s' % e)
     return
@@ -428,6 +445,9 @@ class MainUi(UiRoot):
   self.cameraBusy = False
   self.cameraActionsEnabled = not installerOnly
   self.cameraConnected = False
+  self.cameraInstallEnabled = False
+  self.supportReason = ""
+  self.lastReportedBackendBusy = False
   self.lastReportedState = None
   self.logBuffers = {False: "", True: ""}
   self.autoScroll = True
@@ -658,9 +678,12 @@ class MainUi(UiRoot):
    if self.abortMonitor.wait(3.0):
     break
 
- def fetchSafeCameraInfo(self):
+ def fetchSafeCameraInfo(self, info=None):
   if getattr(self, "fetchingInfo", False) or self.cameraBusy:
    return
+  captured_model = info.get("model") or info.get("name") if info else None
+  captured_serial = info.get("serial") or info.get("raw_serial") if info else None
+  captured_id = (captured_model, captured_serial)
   self.fetchingInfo = True
   def worker():
    try:
@@ -675,7 +698,18 @@ class MainUi(UiRoot):
     else:
      data = None
     if data:
-     self._runSafely(lambda d=data: self.infoFrame.showCameraInfo(d))
+     def apply_info(d=data, cid=captured_id):
+      if not getattr(self, "cameraConnected", False):
+       return
+      current_model = getattr(self.infoFrame, "cameraSnapshot", {}).get("Model")
+      current_serial = getattr(self.infoFrame, "cameraSnapshot", {}).get("Serial number")
+      current_raw = getattr(self.infoFrame, "cameraSnapshot", {}).get("PTP descriptor")
+      if cid[0] and current_model and current_model != "—" and cid[0] != current_model:
+       return
+      if cid[1] and current_serial and current_serial != "—" and cid[1] not in (current_serial, current_raw):
+       return
+      self.infoFrame.showCameraInfo(d)
+     self._runSafely(apply_info)
    except Exception:
     pass
    finally:
@@ -684,10 +718,12 @@ class MainUi(UiRoot):
 
  def onCameraStatusUpdate(self, info):
   appConnected = bool(info and info.get("appConnected"))
-  physical = bool(info and (info.get("physicalDetected") or info.get("connected") or "USB" in str(info.get("status", "")) or info.get("status") in ("access_denied", "unverified")))
+  physical = bool(info and (info.get("physicalDetected") or info.get("connected") or "USB" in str(info.get("status", "")) or info.get("status") in ("access_denied", "unverified", "multiple_devices")))
   status = info.get("status") if info else "disconnected"
   self.lastReportedPhysical = physical
   just_connected = appConnected and not getattr(self, "cameraConnected", False)
+  backend_busy = bool(info and info.get("busy"))
+  self.lastReportedBackendBusy = backend_busy
 
   if getattr(self, "lastReportedState", None) != (appConnected, status):
    self.lastReportedState = (appConnected, status)
@@ -702,29 +738,63 @@ class MainUi(UiRoot):
   if appConnected:
    self.cameraConnected = True
    self.cameraActionsEnabled = True
+
+   if hasattr(info, "get") and info.get("app_installation_supported") is not None:
+    if backend_busy:
+     self.cameraInstallEnabled = False
+     self.supportReason = "Camera is currently busy."
+    else:
+     self.cameraInstallEnabled = bool(info["app_installation_supported"])
+     self.supportReason = info.get("app_installation_reason") or ("Ready to install." if self.cameraInstallEnabled else "Not supported.")
+   else:
+    if backend_busy:
+     self.cameraInstallEnabled = False
+     self.supportReason = "Camera is currently busy."
+    else:
+     self.cameraInstallEnabled = True
+     self.supportReason = ""
+
    self.usbStatusVar.set("● Connected: %s (%s)" % (info.get("name", "Camera"), info.get("mode", "MTP")))
    if hasattr(self, "infoFrame") and hasattr(self.infoFrame, "showConnectedCamera"):
     self.infoFrame.showConnectedCamera(info)
    if hasattr(self, "installerFrame") and hasattr(self.installerFrame, "updateCameraStatus"):
-    self.installerFrame.updateCameraStatus(True, info.get("mode", "MTP"), info.get("name"))
-   if just_connected and hasattr(self, "fetchSafeCameraInfo"):
-    self.fetchSafeCameraInfo()
+    self.installerFrame.updateCameraStatus(True, info.get("mode", "MTP"), info.get("name"), self.cameraInstallEnabled, self.supportReason)
+   if just_connected and hasattr(self, "fetchSafeCameraInfo") and not backend_busy:
+    self.fetchSafeCameraInfo(info)
+
   elif physical:
    self.cameraConnected = False
    self.cameraActionsEnabled = False
-   self.usbStatusVar.set("○ USB detected, MTP unavailable")
+   self.cameraInstallEnabled = False
+   if status == "multiple_devices":
+    reason = info.get("failure_reason") or "Multiple Sony cameras detected. Connect only one Sony camera at a time."
+    self.supportReason = reason
+    self.usbStatusVar.set("○ Multiple Sony cameras connected")
+   elif "access_denied" in status:
+    reason = info.get("failure_reason") or "USB access denied."
+    self.supportReason = reason
+    self.usbStatusVar.set("○ USB detected, MTP unavailable")
+   else:
+    reason = info.get("failure_reason") or "app connection unavailable"
+    self.supportReason = reason
+    self.usbStatusVar.set("○ USB detected, MTP unavailable")
+
    if hasattr(self, "infoFrame") and hasattr(self.infoFrame, "showConnectedCamera"):
     self.infoFrame.showConnectedCamera(info)
    if hasattr(self, "installerFrame") and hasattr(self.installerFrame, "updateCameraStatus"):
-    self.installerFrame.updateCameraStatus(False, info.get("mode", "MTP"), info.get("name"))
+    self.installerFrame.updateCameraStatus(False, info.get("mode", "MTP"), info.get("name"), False, self.supportReason)
+
   else:
    self.cameraConnected = False
    self.cameraActionsEnabled = False
+   self.cameraInstallEnabled = False
+   self.supportReason = "Camera not connected. Connect camera in MTP mode to enable install."
    self.usbStatusVar.set("○ Camera Disconnected")
    if hasattr(self, "infoFrame") and hasattr(self.infoFrame, "showConnectedCamera"):
     self.infoFrame.showConnectedCamera(None)
    if hasattr(self, "installerFrame") and hasattr(self.installerFrame, "updateCameraStatus"):
-    self.installerFrame.updateCameraStatus(False)
+    self.installerFrame.updateCameraStatus(False, installSupported=False, installReason=self.supportReason)
+
   self.setCameraBusy(self.cameraBusy)
 
  def reconnectCamera(self):
@@ -909,6 +979,8 @@ class InfoFrame(UiFrame):
   self.infoVars = {
    "Model": StringVar(value="—"),
    "Vendor": StringVar(value="—"),
+   "App Support": StringVar(value="—"),
+   "App support": StringVar(value="—"),
    "USB mode": StringVar(value="—"),
    "Product code": StringVar(value="—"),
    "Serial number": StringVar(value="—"),
@@ -960,6 +1032,7 @@ class InfoFrame(UiFrame):
   idFields = [
    ("Model:", "Model"),
    ("Vendor:", "Vendor"),
+   ("App Support:", "App Support"),
    ("Body Serial:", "Serial number"),
    ("Product Code:", "Product code"),
    ("Camera Firmware:", "Firmware version"),
@@ -1056,20 +1129,62 @@ class InfoFrame(UiFrame):
    identity_changed = False
    if current_model and model and current_model != "—" and current_model != model:
     identity_changed = True
-   if current_sn and sn and current_sn != "—" and not str(sn).startswith("0000000000000000") and current_sn != str(sn):
+   if current_sn and sn and current_sn not in ("—", "Unavailable without query") and not str(sn).startswith("0000000000000000") and current_sn != str(sn):
     identity_changed = True
    if current_raw and raw_desc and current_raw != "—" and current_raw != raw_desc:
+    identity_changed = True
+   if current_sn and current_sn not in ("—", "Unavailable without query") and raw_desc and not raw_desc.endswith(current_sn) and current_sn not in raw_desc:
+    identity_changed = True
+   if current_raw and current_raw != "—" and sn and not str(sn).startswith("0000000000000000") and sn not in current_raw:
     identity_changed = True
 
    if identity_changed:
     self.cameraSnapshot.clear()
 
+   if not info.get("appConnected"):
+    for stale_key in ["Firmware version", "Lens", "Shutter count", "Shutter note", "Product code", "PTP Capabilities"]:
+     self.cameraSnapshot.pop(stale_key, None)
+
    if model:
     self.cameraSnapshot["Model"] = model
    if info.get("vendor"):
-    self.cameraSnapshot["Vendor"] = info["vendor"]
+    self.cameraSnapshot["Vendor"] = str(info.get("vendor"))
    elif "Vendor" not in self.cameraSnapshot:
     self.cameraSnapshot["Vendor"] = "Sony (0x054c)"
+
+   # Determine App Support string
+   app_support_text = "—"
+   if info.get("mode") == "App installation":
+    app_support_text = "Supported (Installer active)"
+   else:
+    cs = info.get("camera_support")
+    if not cs and model:
+     try:
+      from pmca.compatibility import get_camera_support
+      cs = get_camera_support(model)
+     except Exception:
+      pass
+
+    if cs and isinstance(cs, dict):
+     pmca_apps = cs.get("pmca_apps")
+     tested = cs.get("installation_tested")
+     if pmca_apps is True:
+      if tested:
+       app_support_text = "Supported (Verified on ILCE-7)"
+      else:
+       app_support_text = "Supported (PMCA reference model)"
+     elif pmca_apps is False:
+      app_support_text = "Not supported (No PMCA subsystem)"
+     else:
+      app_support_text = "Unconfirmed model"
+    elif "app_installation_supported" in info:
+     if info["app_installation_supported"] is True:
+      app_support_text = "Supported"
+     elif info["app_installation_supported"] is False:
+      app_support_text = "Not supported"
+
+   self.cameraSnapshot["App Support"] = app_support_text
+   self.cameraSnapshot["App support"] = app_support_text
 
    if info.get("mode"):
     self.cameraSnapshot["USB mode"] = info["mode"]
@@ -1141,8 +1256,14 @@ class InfoFrame(UiFrame):
       reason_text = sc["reason"]
       if "App installation" in reason_text:
        self.cameraSnapshot["Shutter count"] = "Unavailable in App Install mode"
-      elif "No captured image" in reason_text:
+      elif "No captured image" in reason_text or "no photo" in reason_text.lower():
        self.cameraSnapshot["Shutter count"] = "No photo on SD card"
+      elif any(term in reason_text.lower() for term in ["unsupported", "not supported", "not implemented"]):
+       self.cameraSnapshot["Shutter count"] = "Unsupported on this model"
+      elif any(term in reason_text.lower() for term in ["unconfirmed", "unknown"]):
+       self.cameraSnapshot["Shutter count"] = "Unconfirmed for this model"
+      elif "query camera info" in reason_text.lower():
+       self.cameraSnapshot["Shutter count"] = "Query camera info to inspect"
       else:
        self.cameraSnapshot["Shutter count"] = "Unavailable (not exposed over MTP)"
       self.cameraSnapshot["Shutter note"] = reason_text
@@ -1186,6 +1307,7 @@ class InfoFrame(UiFrame):
  def showPassiveUsb(self, dev):
   if not hasattr(self, "cameraSnapshot"):
    self.cameraSnapshot = {}
+  self.cameraSnapshot.clear()
   if dev:
    self.cameraSnapshot["Model"] = dev.get("name") or "Sony Camera"
    self.cameraSnapshot["Vendor"] = dev.get("vendor") or "Sony (0x054c)"
@@ -1199,8 +1321,6 @@ class InfoFrame(UiFrame):
    if hasattr(self, "infoStatus"):
     self.infoStatus.set("macOS detects %s via USB. Note: Full camera session requires native camera transport." % dev.get("name", "Sony Camera"))
   else:
-   if hasattr(self, "cameraSnapshot"):
-    self.cameraSnapshot.clear()
    for key, var in self.infoVars.items():
     var.set("—")
    if hasattr(self, "infoStatus"):
@@ -1230,13 +1350,22 @@ class InfoFrame(UiFrame):
       self.cameraSnapshot["Firmware version"] = str(val)
     elif key == "Shutter count":
      val_sc = str(val)
-     if len(val_sc) > 40 or "not exposed" in val_sc.lower() or "service-mode" in val_sc.lower():
+     if any(term in val_sc.lower() for term in ["unsupported", "not supported", "not implemented"]):
+      self.cameraSnapshot["Shutter count"] = "Unsupported on this model"
+      self.cameraSnapshot["Shutter note"] = val_sc
+     elif any(term in val_sc.lower() for term in ["unconfirmed", "unknown"]):
+      self.cameraSnapshot["Shutter count"] = "Unconfirmed for this model"
+      self.cameraSnapshot["Shutter note"] = val_sc
+     elif len(val_sc) > 40 or "not exposed" in val_sc.lower() or "service-mode" in val_sc.lower():
       self.cameraSnapshot["Shutter count"] = "Unavailable (not exposed over MTP)"
       self.cameraSnapshot["Shutter note"] = val_sc
      else:
       self.cameraSnapshot["Shutter count"] = val_sc
     else:
      self.cameraSnapshot[key] = str(val)
+    if key.lower() == "app support":
+     self.cameraSnapshot["App Support"] = str(val)
+     self.cameraSnapshot["App support"] = str(val)
   for key, var in self.infoVars.items():
    val = getattr(self, "cameraSnapshot", {}).get(key)
    var.set(str(val) if val is not None and val != "" else "—")
@@ -1664,41 +1793,68 @@ class InstallerFrame(UiFrame):
   self.modeVar.set(self.MODE_APK)
   if hasattr(self, "apkRevealButton"):
    self.apkRevealButton.config(state=NORMAL if os.path.isfile(filename) else DISABLED)
+  self._apkIsValid = False
   try:
    with open(filename, "rb") as file:
     apk = ApkParser(file)
+    pkg = apk.getPackageName()
+    if not pkg or not pkg.strip():
+     raise ValueError("Manifest package identifier missing")
     sdk = apk.getMinSdkVersion()
-    sdkStatus = "Android API %d (Camera API 1–10 required; check model/firmware compatibility)" % sdk if 1 <= sdk <= 10 else "Android API %d (Warning: Camera requires API 1–10)" % sdk
+    if not (1 <= sdk <= 10):
+     raise ValueError("Android SDK %d is incompatible (camera requires API 1–10)" % sdk)
+    cert = None
+    try:
+     cert = apk.getCert()
+    except Exception:
+     cert = None
+    if not cert:
+     raise ValueError("APK signature certificate missing or invalid")
+    self._apkIsValid = True
+    sdkStatus = "Android API %d (Camera API 1–10 required; check model/firmware compatibility)" % sdk
     text = "Package: %s\nVersion: %s   •   %s" % (
-     apk.getPackageName() or "Unknown",
+     pkg,
      apk.getVersionName() or "—",
      sdkStatus
     )
    self.apkSummary.set(text)
   except Exception as error:
+   self._apkIsValid = False
    self.apkSummary.set("Could not read APK: %s" % error)
   self.updateInstallButton()
 
  def updateInstallButton(self):
   master = self.master
   cameraReady = bool(getattr(master, "cameraActionsEnabled", False) and getattr(master, "cameraConnected", False))
-  busy = bool(getattr(master, "cameraBusy", False))
+  installSupported = getattr(master, "cameraInstallEnabled", True) is not False
+  backendBusy = bool(getattr(master, "lastReportedBackendBusy", False))
+  busy = bool(getattr(master, "cameraBusy", False) or backendBusy)
   apkPath = self.getSelectedApk()
-  hasValidApk = bool(apkPath and os.path.isfile(apkPath))
-  canInstall = cameraReady and hasValidApk and not busy
+  hasValidApk = bool(apkPath and os.path.isfile(apkPath) and getattr(self, "_apkIsValid", True))
+  canInstall = cameraReady and installSupported and hasValidApk and not busy
   if hasattr(self, "installButton"):
    self.installButton.config(state=NORMAL if canInstall else DISABLED)
   if hasattr(self, "apkRevealButton"):
-   self.apkRevealButton.config(state=NORMAL if (hasValidApk and not busy) else DISABLED)
+   self.apkRevealButton.config(state=NORMAL if (apkPath and os.path.isfile(apkPath) and not busy) else DISABLED)
 
- def updateCameraStatus(self, connected, mode="MTP", cameraName=None):
+ def updateCameraStatus(self, connected, mode="MTP", cameraName=None, installSupported=None, installReason=None):
   if connected:
    name = cameraName or "Camera"
-   self.apkStatusNote.set("Camera connected: %s (%s). Ready to install." % (name, mode))
+   if installSupported is False:
+    reason = installReason or "PMCA app installation is not supported on this model (diagnostic-only)."
+    self.apkStatusNote.set("Camera connected: %s (%s) — %s" % (name, mode, reason))
+   elif getattr(self.master, "lastReportedBackendBusy", False):
+    self.apkStatusNote.set("Camera connected: %s (%s). Camera is busy." % (name, mode))
+   else:
+    self.apkStatusNote.set("Camera connected: %s (%s). Ready to install." % (name, mode))
   else:
    master = self.master
    if getattr(master, "lastReportedPhysical", False):
-    self.apkStatusNote.set("USB device detected on bus, but MTP session unavailable.")
+    reason = installReason or getattr(master, "supportReason", "")
+    if reason and "Multiple" in reason:
+     self.apkStatusNote.set(reason)
+    else:
+     self.apkStatusNote.set("USB device detected on bus, but MTP session unavailable.")
    else:
     self.apkStatusNote.set("Camera not connected. Connect camera in MTP mode to enable install.")
   self.updateInstallButton()
@@ -1936,7 +2092,7 @@ def checkRuntime(outFile):
  key = tlslite.parsePEMKey(pem, private=True)
  sample = b'Sony Open PMCA runtime check'
  result = {
-  'version': version or '1.0.0',
+  'version': version or '1.1.0',
   'python': platform.python_version(),
   'architecture': platform.machine(),
   'frozen': bool(getattr(sys, 'frozen', False)),

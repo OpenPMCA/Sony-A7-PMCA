@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import re
 import unittest
+from unittest.mock import patch
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +40,13 @@ class PackagingFilenamesTest(unittest.TestCase):
             mod.get_asset_name("linux", version="1.0.0", arch="x86_64"),
             "Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage",
         )
+
+    def test_default_asset_names_follow_current_package_version(self):
+        mod = load_build_module()
+        with patch.object(mod, "get_version", return_value="1.1.0"):
+            self.assertEqual(mod.get_asset_name("macos"), "Sony-Open-PMCA-1.1.0-macos-arm64.zip")
+            self.assertEqual(mod.get_asset_name("windows"), "Sony-Open-PMCA-1.1.0-windows-x64.exe")
+            self.assertEqual(mod.get_asset_name("linux"), "Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage")
 
     def test_apprun_argument_forwarding_quoted(self):
         mod = load_build_module()
@@ -80,6 +88,19 @@ class RuntimeReportValidationTest(unittest.TestCase):
             "tls_cipher": "AES256-SHA",
             "tls_version": "TLSv1.2",
         }
+
+    def test_default_report_validation_follows_current_package_version(self):
+        mod = load_build_module()
+        with patch.object(mod, "get_version", return_value="1.1.0"):
+            report = dict(self.valid_report, version="1.1.0")
+            self.assertTrue(mod.validate_runtime_report(report, expected_arch="arm64")["valid"])
+            self.assertFalse(mod.validate_runtime_report(self.valid_report, expected_arch="arm64")["valid"])
+
+    def test_default_cask_version_follows_current_package_version(self):
+        mod = load_build_module()
+        with patch.object(mod, "get_version", return_value="1.1.0"):
+            content = mod.render_cask(sha256_hex="a" * 64)
+        self.assertIn('version "1.1.0"', content)
 
     def test_valid_report_passes(self):
         mod = load_build_module()

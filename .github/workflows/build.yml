@@ -58,9 +58,9 @@ jobs:
       - name: Upload macOS distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-Open-PMCA-1.0.0-macos-arm64
+          name: Sony-Open-PMCA-1.1.0-macos-arm64
           path: |
-            dist/Sony-Open-PMCA-1.0.0-macos-arm64.zip
+            dist/Sony-Open-PMCA-1.1.0-macos-arm64.zip
             dist/runtime-check.json
             Casks/sony-open-pmca.rb
           if-no-files-found: error
@@ -107,14 +107,14 @@ jobs:
       - name: Verify frozen runtime
         shell: pwsh
         run: |
-          python packaging/build.py verify --executable "dist\Sony-Open-PMCA-1.0.0-windows-x64.exe" --arch x64
+          python packaging/build.py verify --executable "dist\Sony-Open-PMCA-1.1.0-windows-x64.exe" --arch x64
 
       - name: Upload Windows distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-Open-PMCA-1.0.0-windows-x64
+          name: Sony-Open-PMCA-1.1.0-windows-x64
           path: |
-            dist/Sony-Open-PMCA-1.0.0-windows-x64.exe
+            dist/Sony-Open-PMCA-1.1.0-windows-x64.exe
             dist/runtime-check.json
           if-no-files-found: error
 
@@ -165,13 +165,13 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
-          xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
+          xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage --arch x64
 
       - name: Upload Linux distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Sony-Open-PMCA-1.0.0-linux-x86_64
+          name: Sony-Open-PMCA-1.1.0-linux-x86_64
           path: |
-            dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage
+            dist/Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage
             dist/runtime-check.json
           if-no-files-found: error

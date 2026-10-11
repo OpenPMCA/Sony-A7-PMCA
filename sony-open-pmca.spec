@@ -60,11 +60,11 @@ app = BUNDLE(
  name='Sony Open PMCA.app',
  bundle_identifier='org.openpmca.sonyopenpmca',
  icon=str(root / 'assets/sony-open-pmca.icns'),
- version='1.0.0',
+ version=version,
  info_plist={
   'CFBundleDisplayName': 'Sony Open PMCA',
-  'CFBundleShortVersionString': '1.0.0',
-  'CFBundleVersion': '1.0.0',
+  'CFBundleShortVersionString': version,
+  'CFBundleVersion': version,
   'NSHighResolutionCapable': True,
  },
 )

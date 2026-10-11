@@ -1,5 +1,13 @@
 # Sony Open PMCA release readiness
 
+## v1.1.0 release preparation (2026-10-11)
+
+The user explicitly authorized GitHub release v1.1.0. The finalized camera-support correction adds model/protocol installation eligibility, body-identity cache and stale-callback isolation, and separate Tag9050a/b image-counter routing. The pre-version-bump correction passed 238 strict source tests without skips and a local 47-module frozen/source parity check; those results remain historical candidate evidence in `camera-support-validation.json`.
+
+v1.1.0 must pass fresh source tests and all three native CI jobs at the exact release source commit. Publish only their verified assets. The main Homebrew Cask is updated from the exact published CI ZIP after its checksum is known. Developer ID signing/notarization and broader physical camera/app verification are not completed and must remain explicit release limitations.
+
+## Historical v1.0.0 local audit
+
 Verification date: 2026-10-11. Product version: 1.0.0. This report distinguishes actual local execution from native build configuration. Public distribution has not been authorized or performed.
 
 ## Verified source and native GUI behavior

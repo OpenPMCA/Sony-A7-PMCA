@@ -51,7 +51,7 @@ def isSonyMtpCamera(info):
   SonyMtpExtCmdDevice.PTP_OC_SonyDiExtCmd_read,
   SonyMtpExtCmdDevice.PTP_OC_SonyReqReconnect,
  ])
- return info.manufacturer == SONY_MANUFACTURER and info.vendorExtension == '' and operations <= info.operationsSupported
+ return info.manufacturer in (SONY_MANUFACTURER, SONY_MANUFACTURER_SHORT) and info.vendorExtension == '' and operations <= info.operationsSupported
 
 def isSonyMtpAppInstallCamera(info):
  """Pass an MTP device info tuple. Guesses if the device is a camera in app installation mode."""
@@ -61,7 +61,7 @@ def isSonyMtpAppInstallCamera(info):
   SonyMtpAppInstallDevice.PTP_OC_SendProxyMessageInfo,
   SonyMtpAppInstallDevice.PTP_OC_SendProxyMessage,
  ])
- return info.manufacturer == SONY_MANUFACTURER and 'sony.net/SEN_PRXY_MSG:' in info.vendorExtension and operations <= info.operationsSupported
+ return info.manufacturer in (SONY_MANUFACTURER, SONY_MANUFACTURER_SHORT) and 'sony.net/SEN_PRXY_MSG:' in info.vendorExtension and operations <= info.operationsSupported
 
 
 class SonyUsbDevice(UsbDevice):

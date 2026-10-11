@@ -627,8 +627,11 @@ class GuiInstallerTest(unittest.TestCase):
    # P0 regression verification: Panel status must match header and installButton disabled without APK
    self.assertIn('ILCE-7', root.installerFrame.apkStatusNote.get())
    self.assertEqual(str(root.installerFrame.installButton['state']), 'disabled')
-   # Staging a valid APK enables installButton
-   root.installerFrame.setApkFile(str(self.apk))
+   # Staging a valid signed APK enables installButton
+   valid_apk = Path(self.temp.name) / 'valid_signed.apk'
+   from tests.apk_fixture import apkFixture
+   valid_apk.write_bytes(apkFixture(signed=True))
+   root.installerFrame.setApkFile(str(valid_apk))
    self.assertEqual(str(root.installerFrame.installButton['state']), 'normal')
    root.close()
 

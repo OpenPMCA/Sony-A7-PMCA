@@ -25,6 +25,7 @@ from ..usb.driver import *
 from ..usb.driver.generic import *
 from ..usb.sony import *
 from ..util import http
+from ..compatibility import get_camera_support, normalize_camera_model
 
 scriptRoot = getattr(sys, '_MEIPASS', os.path.dirname(__file__) + '/../..')
 
@@ -50,6 +51,34 @@ def set_last_verified_camera_status(status):
  global _last_verified_camera_status
  with _status_cache_lock:
   _last_verified_camera_status = dict(status) if status else None
+
+
+
+def _matching_camera_status(model, raw_serial=None, vendor_serial=None):
+ """Reuse body metadata only when the current camera identity is verified."""
+ last = get_last_verified_camera_status()
+ if not last or normalize_camera_model(last.get('model') or last.get('name')) != normalize_camera_model(model):
+  return None
+ def valid_identity(value):
+  return isinstance(value, str) and bool(value.strip()) and set(value.strip()) != {'0'} and value.strip().lower() not in ('unknown', 'none', 'n/a')
+ if valid_identity(vendor_serial) and valid_identity(last.get('serial')) and vendor_serial != last['serial']:
+  return None
+ same_transport = bool(valid_identity(raw_serial) and raw_serial == last.get('raw_serial'))
+ same_body = bool(valid_identity(vendor_serial) and vendor_serial == last.get('serial'))
+ return last if same_transport or same_body else None
+
+
+def _app_installation_support(model, sony_transport=False, installer_protocol=False):
+ profile = get_camera_support(model)
+ if installer_protocol:
+  return profile, True, 'Sony app-installer protocol confirmed.'
+ if profile['pmca_apps'] is False:
+  return profile, False, 'This model is not listed as PMCA app-capable in the upstream device reference.'
+ if profile['pmca_apps'] is None:
+  return profile, False, 'PMCA app support is unconfirmed for this model; no installer protocol is active.'
+ if not sony_transport:
+  return profile, False, 'The camera model is PMCA-capable, but the required Sony transport commands are unavailable.'
+ return profile, True, 'PMCA-capable model and required Sony transport commands detected; APK compatibility is app-specific.'
 
 
 def is_camera_busy():
@@ -281,7 +310,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    'model': passive.get('name') if passive else 'Camera Busy',
    'manufacturer': 'Sony',
    'vendor': 'Sony (0x054c)' if physical_detected else None,
-   'serial': passive.get('serial') if passive else None,
+   'serial': None,
+   'raw_serial': passive.get('serial') if passive else None,
    'firmware_version': None,
    'capabilities': [],
    'properties': [],
@@ -295,6 +325,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
  physical_detected = bool(passive)
 
  if not probe_communication:
+  set_last_verified_camera_status(None)
   if passive:
    return {
     'connected': False,
@@ -307,7 +338,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
     'model': passive.get('name', 'Sony Camera'),
     'manufacturer': 'Sony',
     'vendor': passive.get('vendor', 'Sony (0x054c)'),
-    'serial': passive.get('serial'),
+    'serial': None,
+    'raw_serial': passive.get('serial'),
     'firmware_version': None,
     'capabilities': [],
     'properties': [],
@@ -342,6 +374,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    with importDriver(driverName, quiet=quiet) as driver:
     devices = list(driver.listDevices(SONY_ID_VENDOR))
     if not devices:
+     set_last_verified_camera_status(None)
      if passive:
       return {
        'connected': False,
@@ -354,7 +387,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
        'model': passive.get('name', 'Sony Camera'),
        'manufacturer': 'Sony',
        'vendor': 'Sony (0x054c)',
-       'serial': passive.get('serial'),
+       'serial': None,
+       'raw_serial': passive.get('serial'),
        'firmware_version': None,
        'capabilities': [],
        'properties': [],
@@ -367,6 +401,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
       'connected': False,
       'physicalDetected': False,
       'appConnected': False,
+      'app_installation_supported': False,
       'busy': False,
       'status': 'disconnected',
       'mode': 'Disconnected',
@@ -384,6 +419,20 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
       'failure_reason': 'No camera detected on USB',
      }
 
+    if len(devices) > 1:
+     set_last_verified_camera_status(None)
+     return {
+      'connected': False, 'physicalDetected': True, 'appConnected': False,
+      'busy': False, 'status': 'multiple_devices', 'mode': 'Multiple cameras',
+      'name': None, 'model': None, 'manufacturer': 'Sony', 'vendor': 'Sony (0x054c)',
+      'serial': None, 'raw_serial': None, 'firmware_version': None,
+      'capabilities': [], 'properties': [], 'events': [], 'formats': [],
+      'app_installation_supported': False,
+      'app_installation_reason': 'Connect only one camera at a time to select the intended device safely.',
+      'shutter_count': {'available': False, 'value': None, 'reason': 'More than one Sony device is attached.'},
+      'failure_reason': 'Connect only one camera at a time.',
+     }
+
     dev, dev_type, drv = devices[0]
     if dev_type == USB_CLASS_PTP:
      mtp = MtpDevice(drv)
@@ -397,15 +446,15 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
 
      mode = 'App installation' if isSonyMtpAppInstallCamera(info) else 'MTP' if isSonyMtpCamera(info) else 'PTP'
      ptp_ver = getattr(info, 'version', None)
-     last = get_last_verified_camera_status()
+     last = _matching_camera_status(info.model, raw_serial=info.serialNumber)
      prior_fw = last.get('firmware_version') if last else None
      if prior_fw and not prior_fw.startswith('Unavailable') and prior_fw != ptp_ver:
       fw_ver = prior_fw
      else:
       fw_ver = 'Unavailable without firmware query'
 
-     # Use verified vendor body serial if known, else raw serial
-     body_serial = last.get('serial') if (last and last.get('serial') and not str(last['serial']).startswith('0000000000000000')) else (info.serialNumber[-8:] if (info.serialNumber and len(info.serialNumber) == 32 and info.serialNumber.startswith('0000000000000000')) else info.serialNumber)
+     # Only a vendor-verified body serial belongs in this field.
+     body_serial = last.get('serial') if last else None
      shutter_data = last.get('shutter_count') if last else None
      if not shutter_data:
       if isSonyMtpAppInstallCamera(info):
@@ -421,7 +470,13 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
         'reason': 'Query camera info to inspect shutter count.',
        }
 
+     profile, can_install, install_reason = _app_installation_support(
+      info.model, sony_transport=isSonyMtpCamera(info),
+      installer_protocol=isSonyMtpAppInstallCamera(info))
      res = {
+      'camera_support': profile,
+      'app_installation_supported': can_install,
+      'app_installation_reason': install_reason,
       'connected': True,
       'physicalDetected': True,
       'appConnected': True,
@@ -448,6 +503,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
      return res
 
     elif dev_type == USB_CLASS_MSC:
+     set_last_verified_camera_status(None)
      msc = MscDevice(drv)
      info = msc.getDeviceInfo()
      return {
@@ -462,7 +518,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
       'model': info.model,
       'manufacturer': info.manufacturer,
       'vendor': 'Sony (0x054c)',
-      'serial': passive.get('serial') if passive else None,
+      'serial': None,
+      'raw_serial': passive.get('serial') if passive else None,
       'firmware_version': None,
       'capabilities': [],
       'properties': [],
@@ -477,6 +534,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
      }
 
     else:
+     set_last_verified_camera_status(None)
      return {
       'connected': False,
       'physicalDetected': True,
@@ -488,7 +546,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
       'model': passive.get('name') if passive else 'Sony Device',
       'manufacturer': 'Sony',
       'vendor': 'Sony (0x054c)',
-      'serial': passive.get('serial') if passive else None,
+      'serial': None,
+      'raw_serial': passive.get('serial') if passive else None,
       'firmware_version': None,
       'capabilities': [],
       'properties': [],
@@ -499,15 +558,25 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
      }
 
  except CameraBusyException:
+  last = get_last_verified_camera_status()
+  if last:
+   last.update({
+    'busy': True, 'status': 'busy', 'mode': 'Busy',
+    'source_mode': last.get('source_mode') or last.get('mode'),
+    'failure_reason': 'Camera operation in progress',
+   })
+   return last
   return {
-   'connected': True,
-   'physicalDetected': True,
-   'appConnected': True,
+   'connected': False,
+   'physicalDetected': physical_detected,
+   'appConnected': False,
+   'app_installation_supported': False,
+   'app_installation_reason': 'Camera communication has not yet been verified.',
    'busy': True,
    'status': 'busy',
    'mode': 'Busy',
-   'name': 'Camera Busy',
-   'model': 'Camera Busy',
+   'name': passive.get('name') if passive else None,
+   'model': passive.get('name') if passive else None,
    'manufacturer': 'Sony',
    'vendor': 'Sony (0x054c)',
    'serial': None,
@@ -520,6 +589,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    'failure_reason': 'Camera operation in progress',
   }
  except PermissionError as e:
+  set_last_verified_camera_status(None)
   return {
    'connected': False,
    'physicalDetected': True,
@@ -531,7 +601,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    'model': passive.get('name', 'Sony Camera') if passive else 'Sony Camera',
    'manufacturer': 'Sony',
    'vendor': 'Sony (0x054c)',
-   'serial': passive.get('serial') if passive else None,
+   'serial': None,
+   'raw_serial': passive.get('serial') if passive else None,
    'firmware_version': None,
    'capabilities': [],
    'properties': [],
@@ -541,6 +612,7 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    'failure_reason': 'Camera access denied: %s' % str(e),
   }
  except Exception as e:
+  set_last_verified_camera_status(None)
   err_str = str(e).lower()
   is_access = 'access' in err_str or 'permission' in err_str or getattr(e, 'backend_error_code', None) == -3
   return {
@@ -554,7 +626,8 @@ def getCameraStatus(driverName=None, probe_communication=True, quiet=False):
    'model': passive.get('name') if passive else None,
    'manufacturer': 'Sony',
    'vendor': 'Sony (0x054c)' if physical_detected else None,
-   'serial': passive.get('serial') if passive else None,
+   'serial': None,
+   'raw_serial': passive.get('serial') if passive else None,
    'firmware_version': None,
    'capabilities': [],
    'properties': [],
@@ -719,6 +792,15 @@ def infoCommand(driverName=None):
     elif isinstance(device, SonyExtCmdDevice):
      dev = SonyExtCmdCamera(device)
      info = dev.getCameraInfo()
+     mtp_info = None
+     if isinstance(device, SonyMtpExtCmdDevice):
+      try:
+       mtp_info = device.getDeviceInfo()
+      except Exception:
+       pass
+     last = _matching_camera_status(info.modelName, getattr(mtp_info, 'serialNumber', None), info.serial)
+     if not last:
+      set_last_verified_camera_status(None)
      firmwareOld = None
      try:
       # Ephemeral updater version query (CMD_QUERY_VERSION without CMD_SWITCH_MODE)
@@ -730,12 +812,11 @@ def infoCommand(driverName=None):
       except Exception:
        pass
      except Exception:
-      last = get_last_verified_camera_status()
       if last and last.get('firmware_version') and not last['firmware_version'].startswith('Unavailable'):
        firmwareOld = last['firmware_version']
       else:
        try:
-        mtp_info = device.getDeviceInfo()
+        mtp_info = mtp_info or device.getDeviceInfo()
         ptp_v = getattr(mtp_info, 'version', None)
         firmwareOld = 'PTP %s (firmware query unavailable)' % ptp_v if ptp_v else 'Unknown'
        except Exception:
@@ -743,7 +824,6 @@ def infoCommand(driverName=None):
 
      # Cache verified firmware version for non-intrusive status heartbeats
      if firmwareOld and not firmwareOld.startswith('PTP') and not firmwareOld.startswith('Unavailable') and firmwareOld != 'Unknown':
-      last = get_last_verified_camera_status()
       if last:
        last['firmware_version'] = firmwareOld
        set_last_verified_camera_status(last)
@@ -784,20 +864,42 @@ def getReadOnlyCameraInfo(driverName=None):
   with importDriver(driverName) as driver:
    device = getDevice(driver)
    if not device:
+    set_last_verified_camera_status(None)
     return None
-   if isinstance(device, SonyAppInstallDevice):
-    return getCameraStatus(driverName=driverName)
+   if isinstance(device, SonyMtpAppInstallDevice):
+    mtp_info = device.getDeviceInfo()
+    last = _matching_camera_status(mtp_info.model, raw_serial=mtp_info.serialNumber) or {}
+    if not last:
+     set_last_verified_camera_status(None)
+    profile, can_install, reason = _app_installation_support(
+     mtp_info.model, installer_protocol=isSonyMtpAppInstallCamera(mtp_info))
+    return {
+     'Model': mtp_info.model,
+     'USB mode': 'App installation',
+     'PTP version': getattr(mtp_info, 'version', None) or 'Unavailable',
+     'Serial number': last.get('serial') or 'Unavailable without vendor query',
+     'Firmware version': last.get('firmware_version') or 'Unavailable (read-only app installation mode)',
+     'App support': 'Installer protocol confirmed' if can_install else reason,
+     'Shutter count': 'Unavailable',
+     'Shutter note': 'App installation mode cannot refresh image-counter metadata. Return to normal MTP to inspect an existing image.',
+    }
+   elif isinstance(device, SonyAppInstallDevice):
+    return None
    elif isinstance(device, SonyExtCmdDevice):
     dev = SonyExtCmdCamera(device)
     info = dev.getCameraInfo()
-    firmware_version = 'Unknown'
+    firmware_version = None
     ptp_version = None
+    mtp_info = None
     if isinstance(device, SonyMtpExtCmdDevice):
      try:
       mtp_info = device.getDeviceInfo()
       ptp_version = getattr(mtp_info, 'version', None)
      except Exception:
       pass
+
+    if not _matching_camera_status(info.modelName, getattr(mtp_info, 'serialNumber', None), info.serial):
+     set_last_verified_camera_status(None)
 
     # Read verified firmware if cached, or from plist
     try:
@@ -806,7 +908,7 @@ def getReadOnlyCameraInfo(driverName=None):
     except Exception:
      pass
     if not firmware_version:
-     last = get_last_verified_camera_status()
+     last = _matching_camera_status(info.modelName, getattr(mtp_info, 'serialNumber', None), info.serial)
      if last and last.get('firmware_version') and not last['firmware_version'].startswith('Unavailable') and last['firmware_version'] != ptp_version:
       firmware_version = last['firmware_version']
      else:
@@ -853,9 +955,19 @@ def getReadOnlyCameraInfo(driverName=None):
       pass
 
     # Update cache with verified identity, serial, and shutter data
-    last = get_last_verified_camera_status()
-    if last:
-     last['serial'] = info.serial
+    if mtp_info is not None:
+     last = _matching_camera_status(info.modelName, getattr(mtp_info, 'serialNumber', None), info.serial) or {}
+     profile, can_install, install_reason = _app_installation_support(
+      mtp_info.model, sony_transport=isSonyMtpCamera(mtp_info))
+     last.update({
+      'camera_support': profile, 'app_installation_supported': can_install,
+      'app_installation_reason': install_reason,
+      'model': info.modelName, 'name': info.modelName,
+      'raw_serial': getattr(mtp_info, 'serialNumber', None), 'serial': info.serial,
+      'connected': True, 'appConnected': True, 'physicalDetected': True,
+      'mode': 'MTP', 'source_mode': 'MTP', 'status': 'ready', 'busy': False,
+      'ptp_device_version': ptp_version,
+     })
      if firmware_version != 'Unavailable (read-only MTP)':
       last['firmware_version'] = firmware_version
      if sc_data:
@@ -888,9 +1000,21 @@ def installCommand(driverName=None, apkFile=None, appPackage=None, outFile=None,
     checkApk(io.BytesIO(apkData))
     print('')
 
+   selected_model = None
    with importDriver(driverName) as driver:
     device = getDevice(driver)
     if device and isinstance(device, SonyExtCmdDevice):
+     if isinstance(device, SonyMtpExtCmdDevice):
+      device_info = device.getDeviceInfo()
+      profile, can_install, reason = _app_installation_support(
+       device_info.model, sony_transport=isSonyMtpCamera(device_info))
+     else:
+      model_info = SonyExtCmdCamera(device).getCameraInfo()
+      profile, can_install, reason = _app_installation_support(model_info.modelName, sony_transport=True)
+     if not can_install:
+      print('Error: PMCA installation unavailable: %s' % reason)
+      return
+     selected_model = profile['model']
      print('Switching to app install mode')
      try:
       SonyExtCmdCamera(device).switchToAppInstaller()
@@ -913,6 +1037,14 @@ def installCommand(driverName=None, apkFile=None, appPackage=None, outFile=None,
       print('Operation timed out. Please run this command again when your camera has connected.')
 
     if device and isinstance(device, SonyAppInstallDevice):
+     if isinstance(device, SonyMtpAppInstallDevice):
+      installer_info = device.getDeviceInfo()
+      if selected_model and normalize_camera_model(installer_info.model) != selected_model:
+       print('Error: Camera model changed during installer transition; installation cancelled.')
+       return
+      if not isSonyMtpAppInstallCamera(installer_info):
+       print('Error: PMCA installation unavailable: Sony installer proxy commands are not confirmed.')
+       return
      return installApp(device, apkFile=io.BytesIO(apkData) if apkData else None, appPackage=None if apkData else appPackage, outFile=outFile, statusFunc=statusFunc)
     elif device:
      print('Error: Cannot use camera in this mode. Please switch to MTP or mass storage mode.')

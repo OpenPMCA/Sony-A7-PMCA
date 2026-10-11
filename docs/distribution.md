@@ -1,6 +1,6 @@
 # Sony Open PMCA distribution
 
-Sony Open PMCA retains the same native Info, Application and Logs flows on each platform. The product version is 1.0.0. Automatic Store synchronization fetches metadata only. APK download requires a selected action. Installation requires a separate confirmation and a usable camera.
+Sony Open PMCA retains the same native Info, Application and Logs flows on each platform. The product version is 1.1.0. Automatic Store synchronization fetches metadata only. APK download requires a selected action. Installation requires a separate confirmation and a usable camera.
 
 ## Native builds and runtime checks
 
@@ -8,9 +8,9 @@ PyInstaller builds must run on the target operating system. This Apple Silicon h
 
 | Platform | Intended artifact | Driver default | Verification status |
 |---|---|---|---|
-| Apple Silicon macOS | `Sony-Open-PMCA-1.0.0-macos-arm64.zip` | libusb MTP | Local ARM64 bundle and frozen runtime verified. Final archive is regenerated after source stabilization. |
-| Windows x64 | `Sony-Open-PMCA-1.0.0-windows-x64.exe` | Native Windows Portable Devices, with libusb fallback | Verified on native `windows-2022` runner (Run 38111647230). Standalone executable and `--check-runtime` diagnostic passed. |
-| Linux x86_64 | `Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage` | libusb | Verified on native `ubuntu-22.04` runner (Run 38111647230). Pinned `appimagetool` and final `.AppImage` `--check-runtime` diagnostic passed under Xvfb. |
+| Apple Silicon macOS | `Sony-Open-PMCA-1.1.0-macos-arm64.zip` | libusb MTP | Native v1.1.0 CI build and runtime verification pending; earlier local v1.0.0 evidence is retained separately. |
+| Windows x64 | `Sony-Open-PMCA-1.1.0-windows-x64.exe` | Native Windows Portable Devices, with libusb fallback | v1.1.0 native verification pending. Historical v1.0.0 run 38111647230 passed on `windows-2022`. |
+| Linux x86_64 | `Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage` | libusb | v1.1.0 native verification pending. Historical v1.0.0 run 38111647230 passed on `ubuntu-22.04`, including the final AppImage. |
 
 Install the repository requirements in an isolated build environment, then run:
 
@@ -32,10 +32,10 @@ The final deliverable must execute its own dependency and encrypted loopback dia
 python packaging/build.py verify --executable 'dist/Sony Open PMCA.app/Contents/MacOS/Sony Open PMCA' --arch arm64
 
 # Windows, including GUI-subsystem process completion
-python packaging/build.py verify --executable 'dist/Sony-Open-PMCA-1.0.0-windows-x64.exe' --arch x64
+python packaging/build.py verify --executable 'dist/Sony-Open-PMCA-1.1.0-windows-x64.exe' --arch x64
 
 # Linux, including the actual AppImage launcher and container
-APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage --arch x64
+APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a python packaging/build.py verify --executable dist/Sony-Open-PMCA-1.1.0-linux-x86_64.AppImage --arch x64
 ```
 
 The verifier waits for process completion and rejects incorrect architecture, source-mode output, failed libusb loading, missing Tcl, certificate failures, failed encryption roundtrip or failed TLS handshake. Static tests and workflow configuration do not prove native execution.
@@ -44,7 +44,7 @@ The verifier waits for process completion and rejects incorrect architecture, so
 
 The packager validates the ARM64 executable and deep/strict code-signature integrity, then creates a ZIP preserving bundle symlinks. It derives the cask checksum from that exact ZIP. It also reads native Mach-O deployment targets across bundled frameworks and records the highest minimum operating-system requirement in the cask.
 
-The current local Python and Tcl/Tk dependencies require macOS 27.0. The bundled libusb requires macOS 26.0. The bootloader's lower deployment target does not make this particular archive compatible with older macOS releases. An older-system release must be built and tested with older compatible dependencies. The native macOS CI job is intended to produce that separate artifact, but its execution has not been verified here.
+The historical local v1.0.0 Python and Tcl/Tk dependencies require macOS 27.0. The v1.1.0 public macOS artifact will use the native CI build and its measured deployment floor, not a renamed local archive. The bundled libusb requires macOS 26.0. The bootloader's lower deployment target does not make this particular archive compatible with older macOS releases. An older-system release must be built and tested with older compatible dependencies. The native macOS CI job is intended to produce that separate artifact, but its execution has not been verified here.
 
 The cask lives in `Casks/sony-open-pmca.rb`. Its download URL references this repository's future release. That release is not yet published, so these are installation commands for after publication, not currently available downloads:
 
@@ -66,7 +66,7 @@ The local bundle is ad-hoc signed, not Developer ID signed or notarized. Homebre
 - Native Windows and Linux jobs must finish and verify their actual final artifacts. Test USB communication and selected installation on supported cameras on those platforms before declaring camera compatibility.
 - The macOS public artifact needs a tested compatibility floor and a deliberate Developer ID signing/notarization decision.
 - Regenerate the cask and checksum from the final published ZIP. Do not reuse the checksum from a different native-runner or local build.
-- Publication requires explicit authorization. No commit, push, tag, GitHub release, tap repository or public binary upload was performed during this implementation.
+- The user explicitly authorized release v1.1.0 on 2026-10-11. Source publication, tag and binary publication proceed only after their verification gates; do not treat the historical v1.0.0 reports as v1.1.0 build evidence.
 - A successful APK package/API/certificate check does not prove an application works on every camera model. Keep model requirements and maintainer caveats visible. RecipeLab is the application whose installation was confirmed on the connected ILCE-7.
 
 Primary tooling references: [GitHub native runner architectures](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), [PyInstaller documentation](https://pyinstaller.org/en/stable/), [AppImage tool releases](https://github.com/AppImage/appimagetool/releases), and [Homebrew cask cookbook](https://docs.brew.sh/Cask-Cookbook).

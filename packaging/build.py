@@ -43,7 +43,7 @@ def get_version() -> str:
             sys.path.pop(0)
         return ver
     except Exception:
-        return "1.0.0"
+        return "1.1.0"
 
 
 def normalize_arch(arch: str) -> str:
@@ -56,8 +56,9 @@ def normalize_arch(arch: str) -> str:
     return a
 
 
-def get_asset_name(os_name: str, version: str = "1.0.0", arch: str = None) -> str:
+def get_asset_name(os_name: str, version: str = None, arch: str = None) -> str:
     """Return canonical versioned asset name for platform."""
+    version = version or get_version()
     os_lower = os_name.lower()
     if "darwin" in os_lower or "mac" in os_lower:
         target_arch = arch or "arm64"
@@ -176,7 +177,7 @@ def find_libusb(platform_override: str = None) -> Path:
 
 
 def validate_runtime_report(
-    report_data_or_path, expected_version: str = "1.0.0", expected_arch: str = None
+    report_data_or_path, expected_version: str = None, expected_arch: str = None
 ) -> dict:
     """Strictly validate runtime report fields and return validation dict.
     
@@ -188,6 +189,7 @@ def validate_runtime_report(
       - tls_handshake_verified
     Enforces matching version and architecture.
     """
+    expected_version = expected_version or get_version()
     if isinstance(report_data_or_path, (str, Path)):
         p = Path(report_data_or_path)
         if not p.exists():
@@ -268,8 +270,9 @@ def get_macos_minimum(app_path: Path) -> str:
     return '.'.join(str(component) for component in max(versions))
 
 
-def render_cask(version: str = "1.0.0", sha256_hex: str = "", min_macos: str = "11.0") -> str:
+def render_cask(version: str = None, sha256_hex: str = "", min_macos: str = "11.0") -> str:
     """Render Homebrew cask Ruby definition for Sony Open PMCA."""
+    version = version or get_version()
     if not sha256_hex or len(sha256_hex) != 64:
         raise ValueError("Valid 64-character SHA-256 checksum is required for Homebrew cask")
     releases = {'11': 'big_sur', '12': 'monterey', '13': 'ventura',

@@ -32,6 +32,7 @@ try:
   assert str(root.installerFrame.installButton['state']) == 'disabled'
   root.cameraActionsEnabled = True  # Test-only: all camera commands below are mocked.
   root.cameraConnected = True
+  root.cameraInstallEnabled = True
   root.setCameraBusy(False)
   notebook = next(widget for widget in root.winfo_children() if widget.winfo_class() == 'TNotebook')
   assert [notebook.tab(tab, 'text') for tab in notebook.tabs()] == ['Camera', 'Applications', 'Activity']
@@ -52,7 +53,7 @@ try:
   from apk_fixture import apkFixture
   import tempfile
   temp_apk = tempfile.NamedTemporaryFile(suffix='.apk', delete=False)
-  temp_apk.write(apkFixture())
+  temp_apk.write(apkFixture(signed=True))
   temp_apk.close()
   root.installerFrame.setApkFile(temp_apk.name)
   assert str(root.installerFrame.installButton['state']) == 'normal'
@@ -72,6 +73,27 @@ try:
   assert root.infoFrame.infoVars['Model'].get() == 'ILCE-7'
   assert root.infoFrame.infoVars['Firmware version'].get() == '3.20'
   gui['listApps'].assert_not_called()
+
+  # Transition to unsupported camera (ILCE-7M3): Info stays normal, Install disables immediately
+  info_7m3 = {
+   'connected': True, 'physicalDetected': True, 'appConnected': True,
+   'status': 'ready', 'mode': 'MTP', 'name': 'ILCE-7M3', 'model': 'ILCE-7M3',
+   'app_installation_supported': False,
+   'app_installation_reason': 'This model is not listed as PMCA app-capable in the upstream device reference.',
+  }
+  root.onCameraStatusUpdate(info_7m3)
+  root.update()
+  assert str(root.infoFrame.infoButton['state']) == 'normal'
+  assert str(root.installerFrame.installButton['state']) == 'disabled'
+  assert root.infoFrame.infoVars['Model'].get() == 'ILCE-7M3'
+  assert root.infoFrame.infoVars['App Support'].get() == 'Not supported (No PMCA subsystem)'
+
+  # Disconnect: fields reset to '—', both buttons disabled
+  root.onCameraStatusUpdate(None)
+  root.update()
+  assert str(root.infoFrame.infoButton['state']) == 'disabled'
+  assert str(root.installerFrame.installButton['state']) == 'disabled'
+  assert root.infoFrame.infoVars['Model'].get() == '—'
 finally:
  if root is not None:
   root.destroy()
