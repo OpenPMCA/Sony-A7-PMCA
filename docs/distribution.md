@@ -9,8 +9,8 @@ PyInstaller builds must run on the target operating system. This Apple Silicon h
 | Platform | Intended artifact | Driver default | Verification status |
 |---|---|---|---|
 | Apple Silicon macOS | `Sony-A7-PMCA-1.0.0-macos-arm64.zip` | libusb MTP | Local ARM64 bundle and frozen runtime verified. Final archive is regenerated after source stabilization. |
-| Windows x64 | `Sony-A7-PMCA-1.0.0-windows-x64.exe` | Native Windows Portable Devices, with libusb fallback | Native build and runtime execution require the Windows runner. |
-| Linux x86_64 | `Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage` | libusb | Native build and final AppImage execution require the Linux runner. |
+| Windows x64 | `Sony-A7-PMCA-1.0.0-windows-x64.exe` | Native Windows Portable Devices, with libusb fallback | Verified on native `windows-2022` runner (Run 38108354284). Standalone executable and `--check-runtime` diagnostic passed. |
+| Linux x86_64 | `Sony-A7-PMCA-1.0.0-linux-x86_64.AppImage` | libusb | Verified on native `ubuntu-22.04` runner (Run 38108354284). Pinned `appimagetool` and final `.AppImage` `--check-runtime` diagnostic passed under Xvfb. |
 
 Install the repository requirements in an isolated build environment, then run:
 

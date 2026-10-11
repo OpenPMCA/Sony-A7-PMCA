@@ -14,8 +14,8 @@ This document separates automated tests, native runtime checks and actual camera
 | Apple Silicon frozen runtime | Pre-migration archive passed libusb/Tcl/certificate/encryption/TLS, code-tree parity and deep/strict ad-hoc signature checks. The renamed archive is reverified separately. | Required local dependencies and encrypted loopback exchange worked on the test host. | Apple notarization or older-macOS compatibility. |
 | Camera installation | RecipeLab installation on Sony ILCE-7 completed with camera result code 0 and user confirmation. | That selected transfer succeeded on the tested body. | Other app installs or Windows/Linux camera operations. |
 | Shutter metadata | Decoder, flash/rollover and bounded MTP contracts tested with fixtures/reference data. | Covered decoder behavior and honest unavailable/ambiguous states. | A current physical-camera count; the camera was disconnected for final verification. |
-| Windows EXE | Native CI job configured; actual result linked below when run. | Build/runtime gates are defined. | A successful Windows artifact until the job passes. |
-| Linux AppImage | Native CI job configured; actual result linked below when run. | Build and final AppImage launcher/runtime gates are defined. | A successful Linux artifact until the job passes. |
+| Windows EXE | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/runs/38108354284)). | Native 64-bit Windows build, PyInstaller one-file packaging, and `--check-runtime` frozen diagnostic executed and passed on `windows-2022`. | Physical camera communication over Windows WPD driver in production. |
+| Linux AppImage | **Passed in CI** ([Run 38108354284](https://github.com/OpenPMCA/Sony-A7-PMCA/actions/runs/38108354284)). | Native Linux build, Xvfb GUI smoke test, `appimagetool` packaging, and final `.AppImage` `--check-runtime` execution passed on `ubuntu-22.04`. | Physical camera communication over Linux libusb in production. |
 
 ## Reproduce local verification
 
