@@ -1,5 +1,17 @@
 # Sony Open PMCA release readiness
 
+## Published v1.2.0 release (2026-10-13)
+
+[v1.2.0 is stable/latest](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.2.0), tagged at `bf199020474fbf81651858608d4a4a2ed0ca31e1`. [Native CI 38355014314](https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38355014314) passed all three source, Tk, build and final-runtime paths. Each runner executed 302 tests: 295 passed and 7 optional real-APK/ExifTool checks were skipped; all 302 ran locally without warnings or skips.
+
+The exact Mac ZIP requires macOS 14.0, passed 47-module source parity, deep/strict ad-hoc signature and relocated encrypted runtime, and has SHA-256 `ae123f7a6e56659b2b864d96d7b39b0ac48cfb252af3ce335d09f06c826e8113`. The public Cask matches it. GUI header/footer report `v1.2.0` / `Version 1.2.0`.
+
+The release adds bounded UI/log work, visible 5,000-line retention, local download cancellation, focus/progress/task-state improvements and actual MSC/installer contract fixes. [Release evidence](release-validation-1.2.0.json) and [UI measurement methods](ui-performance.md) disclose binary checksums, runtime results and remaining cold-map/large-window idle/debounce limits. Failed runs 38350676874 and 38352790323 were fixed and are not claimed passed.
+
+No private Tk-variable manipulation, global GC disabling, OS-permission bypass or automatic camera action was used. macOS remains ad-hoc signed and not notarized; physical MSC, live shutter and broader camera/app support are not certified.
+
+## Historical release records
+
 ## Published v1.1.0 release (2026-10-11)
 
 The user explicitly authorized GitHub release v1.1.0. The finalized camera-support correction adds model/protocol installation eligibility, body-identity cache and stale-callback isolation, and separate Tag9050a/b image-counter routing. The pre-version-bump correction passed 238 strict source tests without skips and a local 47-module frozen/source parity check; those results remain historical candidate evidence in `camera-support-validation.json`.

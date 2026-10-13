@@ -1,6 +1,6 @@
 cask "sony-open-pmca" do
-  version "1.1.0"
-  sha256 "395ec2bb352f863692b6322b9a52b93061eedcbea19877ff03c46da9552ecf3c"
+  version "1.2.0"
+  sha256 "ae123f7a6e56659b2b864d96d7b39b0ac48cfb252af3ce335d09f06c826e8113"
 
   url "https://github.com/OpenPMCA/Sony-Open-PMCA/releases/download/v#{version}/Sony-Open-PMCA-#{version}-macos-arm64.zip"
   name "Sony Open PMCA"

@@ -40,7 +40,7 @@ Only Sony cameras with the built-in Android-based PlayMemories Camera Apps subsy
 
 ## Installation & Downloads
 
-v1.2.0 is the current release candidate; the downloads below become available after its native build/runtime/hash gates pass. Until then, the published stable release is [v1.1.0](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.1.0).
+[v1.2.0 is published](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.2.0), with native macOS/Windows/Linux builds, SHA-256 checksums and [sanitized release evidence](docs/release-validation-1.2.0.json). v1.1.0 remains available unchanged.
 
 ### macOS
 Built for Apple Silicon (`arm64`), requiring macOS 14 Sonoma or newer.

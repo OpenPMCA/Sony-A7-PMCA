@@ -1,0 +1,164 @@
+{
+  "version": "1.2.0",
+  "date": "2026-10-13",
+  "source_commit": "bf199020474fbf81651858608d4a4a2ed0ca31e1",
+  "native_ci": {
+    "run_id": 38355014314,
+    "url": "https://github.com/OpenPMCA/Sony-Open-PMCA/actions/runs/38355014314",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "Linux (x86_64 AppImage)",
+        "conclusion": "success"
+      },
+      {
+        "name": "macOS (Apple Silicon ARM64)",
+        "conclusion": "success"
+      },
+      {
+        "name": "Windows (x64)",
+        "conclusion": "success"
+      }
+    ],
+    "source_test_results": [
+      {
+        "platform": "macOS (Apple Silicon ARM64)",
+        "tests": 302,
+        "passed": 295,
+        "skipped": 7,
+        "errors": 0,
+        "failures": 0,
+        "skip_scope": "Optional real APK/ExifTool references unavailable on CI; exercised locally."
+      },
+      {
+        "platform": "Windows (x64)",
+        "tests": 302,
+        "passed": 295,
+        "skipped": 7,
+        "errors": 0,
+        "failures": 0,
+        "skip_scope": "Optional real APK/ExifTool references unavailable on CI; exercised locally."
+      },
+      {
+        "platform": "Linux (x86_64 AppImage)",
+        "tests": 302,
+        "passed": 295,
+        "skipped": 7,
+        "errors": 0,
+        "failures": 0,
+        "skip_scope": "Optional real APK/ExifTool references unavailable on CI; exercised locally."
+      }
+    ]
+  },
+  "local_source_tests": {
+    "tests": 302,
+    "failures": 0,
+    "errors": 0,
+    "skipped": [],
+    "passed": true
+  },
+  "gui_version": {
+    "header": "v1.2.0",
+    "footer": "Version 1.2.0",
+    "real_widget_regression_passed": true
+  },
+  "artifacts": [
+    {
+      "platform": "macos-arm64",
+      "filename": "Sony-Open-PMCA-1.2.0-macos-arm64.zip",
+      "bytes": 14990070,
+      "sha256": "ae123f7a6e56659b2b864d96d7b39b0ac48cfb252af3ce335d09f06c826e8113"
+    },
+    {
+      "platform": "windows-x64",
+      "filename": "Sony-Open-PMCA-1.2.0-windows-x64.exe",
+      "bytes": 20445671,
+      "sha256": "0bcb19aba027f4ab417f9899c94abc39b8d8a892d93a39a3eb4424d1ff23145d"
+    },
+    {
+      "platform": "linux-x86_64",
+      "filename": "Sony-Open-PMCA-1.2.0-linux-x86_64.AppImage",
+      "bytes": 26868216,
+      "sha256": "539576347f076474117be4ec50adedbc6dfb09ddd4780432f8119599ff1bcdbc"
+    }
+  ],
+  "frozen_runtime_reports": {
+    "macos-arm64": {
+      "version": "1.2.0",
+      "python": "3.11.9",
+      "architecture": "arm64",
+      "frozen": true,
+      "tcl_version": "8.6.13",
+      "libusb_loads": true,
+      "spk_roundtrip": true,
+      "certificate_key_parses": true,
+      "tls_handshake_verified": true,
+      "tls_cipher": "AES256-SHA",
+      "tls_version": "TLSv1.2"
+    },
+    "windows-x64": {
+      "version": "1.2.0",
+      "python": "3.11.9",
+      "architecture": "AMD64",
+      "frozen": true,
+      "tcl_version": "8.6.12",
+      "libusb_loads": true,
+      "spk_roundtrip": true,
+      "certificate_key_parses": true,
+      "tls_handshake_verified": true,
+      "tls_cipher": "AES256-SHA",
+      "tls_version": "TLSv1.2"
+    },
+    "linux-x86_64": {
+      "version": "1.2.0",
+      "python": "3.11.17",
+      "architecture": "x86_64",
+      "frozen": true,
+      "tcl_version": "8.6.12",
+      "libusb_loads": true,
+      "spk_roundtrip": true,
+      "certificate_key_parses": true,
+      "tls_handshake_verified": true,
+      "tls_cipher": "AES256-SHA",
+      "tls_version": "TLSv1.2"
+    }
+  },
+  "macos": {
+    "minimum_version": "14.0",
+    "ad_hoc_signed": true,
+    "notarized": false,
+    "archive_integrity": true,
+    "deep_strict_signature": true,
+    "relocated_runtime_passed": true,
+    "frozen_source_parity": {
+      "passed": true,
+      "modules_checked": 47,
+      "builder_python": "3.11",
+      "comparison": "Complete module code trees, ignoring filename only"
+    }
+  },
+  "ui_measurement": {
+    "report": "docs/ui-performance-1.2.0.json",
+    "gui_source_sha256": "1bc6957b917696d0cc2580919d1d755095cc5cebbb2b7c7b8d85de4a90c07ae5",
+    "controlled_fake_providers": true,
+    "retained_log_lines": 5000,
+    "omission_disclosed": true
+  },
+  "limits": [
+    "Only Sony ILCE-7 with RecipeLab has recorded physical installation verification.",
+    "No live MSC/kernel ownership/installer transition or shutter test was performed in this release pass.",
+    "Full camera OS access is not granted by USB Mass Storage; app transfer uses MTP installer proxy.",
+    "No automatic mounted MSC capture/unmount/eject; offline contract tests are not universal hardware proof.",
+    "Native CI proves covered source/Tk/runtime paths, not all OS/camera/app pairings or zero bugs.",
+    "macOS is ad-hoc signed, not Developer ID signed or notarized.",
+    "Cold first Store map and large-window idle timing misses are disclosed in the UI report.",
+    "Debounced filter completion differs from immediate typing response; exceptionally large lines retain native layout costs."
+  ],
+  "publication": {
+    "url": "https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.2.0",
+    "published_at": "2026-10-13T06:16:06Z",
+    "stable": true,
+    "latest": true,
+    "all_server_asset_sha256_verified": true
+  }
+}

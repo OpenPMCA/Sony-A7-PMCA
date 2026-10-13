@@ -6,7 +6,7 @@ RecipeLab and other PMCA apps run on the camera, not on macOS. Sony Open PMCA tr
 
 [v1.1.0](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.1.0) is a published Apple Silicon release requiring macOS 14 Sonoma or newer. Its CI archive, encrypted runtime, ad-hoc signature and source parity were verified; [the release evidence](release-validation-1.1.0.json) records exactly what was tested. It is not Developer ID signed or notarized.
 
-v1.2.0 is a reliability/UI improvement under development, not a renamed older archive. Its minimum OS, checksum and runtime status must be derived from its final native build. Do not use the older macOS-27-only local build to claim broader compatibility.
+[v1.2.0](https://github.com/OpenPMCA/Sony-Open-PMCA/releases/tag/v1.2.0) is the current published reliability/UI release, built and runtime-tested on native `macos-14`. Its exact CI ZIP requires macOS 14.0, matches the public Cask/checksum and passed relocated runtime plus 47-module source parity; [new evidence](release-validation-1.2.0.json) is separate from v1.1.0 history. Do not use the older macOS-27-only local archive to infer this release's compatibility.
 
 Camera/Applications/Activity are native Tk views. Read-only Info and install controls depend on actual connection, model/protocol eligibility and operation state. Installation on ILCE-7 with RecipeLab is the only physical installation result recorded here; other pairings and live image counters need their own verification.
 
