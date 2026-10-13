@@ -2,7 +2,7 @@
   "version": "1.2.0",
   "measurement_date": "2026-10-13",
   "baseline_commit": "202a4bce79ee498d7a0e6cd5c8fb7799c56bf7a6",
-  "candidate": "Final review-fixed v1.2.0 source before native artifact build",
+  "candidate": "Final v1.2.0 native-CI-repair candidate before native build",
   "environment": {
     "host": "macOS-27.2-arm64-arm-64bit-Mach-O",
     "python": "3.14.8",
@@ -13,7 +13,7 @@
     "cold_map": "Real Tk mainloop with500ms equal warmup; producer uses only queue.run, no manual _processQueue; paced10lines/10ms over2s; heartbeat tail retained; navigation includes timerlateness+callbackpaint; filters awaitallchunks",
     "warmed": "Real Tk mainloop with500ms windowwarmup+both-tabs250ms realization warmup; producer uses only queue.run, no manual _processQueue; paced10lines/10ms over2s; heartbeat tail retained; navigation includes timerlateness+callbackpaint; filters awaitallchunks"
   },
-  "source_sha256": "10f773c2e318121e4fa453e5de0d150ad112e492dad8913035fcd1e7b0ef8e33",
+  "source_sha256": "1bc6957b917696d0cc2580919d1d755095cc5cebbb2b7c7b8d85de4a90c07ae5",
   "results": {
     "1160x760": {
       "before": {
@@ -104,21 +104,21 @@
       },
       "after": {
         "idle": {
-          "elapsed_ms": 1004.587,
+          "elapsed_ms": 1028.051,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
             "samples": 116,
-            "p95_ms": 36.704,
-            "max_ms": 60.332,
-            "median_ms": 5.68
+            "p95_ms": 38.395,
+            "max_ms": 48.584,
+            "median_ms": 6.032
           },
           "navigation_callback_plus_render": {
-            "samples": 15,
-            "p95_ms": 49.269,
-            "max_ms": 57.857,
-            "median_ms": 19.607
+            "samples": 16,
+            "p95_ms": 43.965,
+            "max_ms": 46.793,
+            "median_ms": 24.816
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -131,27 +131,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2212.95,
+          "elapsed_ms": 2212.192,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 269,
-            "p95_ms": 35.638,
-            "max_ms": 50.174,
-            "median_ms": 5.68
+            "samples": 239,
+            "p95_ms": 38.876,
+            "max_ms": 50.625,
+            "median_ms": 6.045
           },
           "navigation_callback_plus_render": {
             "samples": 34,
-            "p95_ms": 40.77,
-            "max_ms": 45.683,
-            "median_ms": 25.374
+            "p95_ms": 40.25,
+            "max_ms": 48.868,
+            "median_ms": 27.372
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 34.763,
-            "max_ms": 51.061,
-            "median_ms": 10.503
+            "p95_ms": 39.799,
+            "max_ms": 48.073,
+            "median_ms": 10.958
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -159,30 +159,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 242.292,
+          "elapsed_ms": 242.563,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
-            "samples": 24,
-            "p95_ms": 16.708,
-            "max_ms": 54.48,
-            "median_ms": 5.609
+            "samples": 25,
+            "p95_ms": 14.769,
+            "max_ms": 44.202,
+            "median_ms": 6.07
           },
           "navigation_callback_plus_render": {
             "samples": 4,
-            "p95_ms": 37.744,
-            "max_ms": 49.227,
-            "median_ms": 26.614
+            "p95_ms": 39.371,
+            "max_ms": 39.63,
+            "median_ms": 27.358
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 29.664,
-            "max_ms": 29.707,
-            "median_ms": 17.976
+            "p95_ms": 34.616,
+            "max_ms": 34.735,
+            "median_ms": 16.694
           },
           "expired": false,
-          "full_search_settle_ms": 175.32,
+          "full_search_settle_ms": 175.429,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -276,21 +276,21 @@
       },
       "cold_after": {
         "idle": {
-          "elapsed_ms": 1004.511,
+          "elapsed_ms": 1001.063,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 119,
-            "p95_ms": 38.806,
-            "max_ms": 49.429,
-            "median_ms": 5.622
+            "samples": 107,
+            "p95_ms": 41.398,
+            "max_ms": 51.796,
+            "median_ms": 6.102
           },
           "navigation_callback_plus_render": {
             "samples": 15,
-            "p95_ms": 44.37,
-            "max_ms": 47.886,
-            "median_ms": 33.728
+            "p95_ms": 47.941,
+            "max_ms": 51.038,
+            "median_ms": 19.824
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -303,27 +303,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2243.003,
+          "elapsed_ms": 2209.781,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 276,
-            "p95_ms": 36.181,
-            "max_ms": 44.905,
-            "median_ms": 5.635
+            "samples": 242,
+            "p95_ms": 36.426,
+            "max_ms": 49.621,
+            "median_ms": 6.086
           },
           "navigation_callback_plus_render": {
-            "samples": 35,
-            "p95_ms": 38.575,
-            "max_ms": 41.231,
-            "median_ms": 15.949
+            "samples": 34,
+            "p95_ms": 40.171,
+            "max_ms": 49.355,
+            "median_ms": 25.548
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 33.888,
-            "max_ms": 44.326,
-            "median_ms": 10.654
+            "p95_ms": 37.47,
+            "max_ms": 51.214,
+            "median_ms": 11.59
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -331,30 +331,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 244.257,
+          "elapsed_ms": 248.976,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
-            "samples": 29,
-            "p95_ms": 16.29,
-            "max_ms": 43.175,
-            "median_ms": 5.707
+            "samples": 26,
+            "p95_ms": 19.318,
+            "max_ms": 49.933,
+            "median_ms": 6.118
           },
           "navigation_callback_plus_render": {
             "samples": 4,
-            "p95_ms": 20.861,
-            "max_ms": 42.372,
-            "median_ms": 17.919
+            "p95_ms": 27.258,
+            "max_ms": 45.073,
+            "median_ms": 21.158
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 37.245,
-            "max_ms": 37.377,
-            "median_ms": 21.58
+            "p95_ms": 39.707,
+            "max_ms": 39.802,
+            "median_ms": 17.907
           },
           "expired": false,
-          "full_search_settle_ms": 178.567,
+          "full_search_settle_ms": 176.603,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -456,21 +456,21 @@
       },
       "after": {
         "idle": {
-          "elapsed_ms": 1004.83,
+          "elapsed_ms": 1034.115,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 131,
-            "p95_ms": 29.13,
-            "max_ms": 52.22,
-            "median_ms": 5.644
+            "samples": 115,
+            "p95_ms": 39.41,
+            "max_ms": 47.16,
+            "median_ms": 5.99
           },
           "navigation_callback_plus_render": {
-            "samples": 17,
-            "p95_ms": 37.727,
-            "max_ms": 50.65,
-            "median_ms": 15.696
+            "samples": 16,
+            "p95_ms": 41.82,
+            "max_ms": 43.327,
+            "median_ms": 25.538
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -483,27 +483,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2199.057,
+          "elapsed_ms": 2217.262,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 288,
-            "p95_ms": 29.781,
-            "max_ms": 40.694,
-            "median_ms": 5.579
+            "samples": 261,
+            "p95_ms": 33.04,
+            "max_ms": 43.667,
+            "median_ms": 5.946
           },
           "navigation_callback_plus_render": {
             "samples": 36,
-            "p95_ms": 34.092,
-            "max_ms": 39.166,
-            "median_ms": 20.173
+            "p95_ms": 37.357,
+            "max_ms": 39.375,
+            "median_ms": 21.622
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 31.734,
-            "max_ms": 40.2,
-            "median_ms": 9.786
+            "p95_ms": 33.551,
+            "max_ms": 47.472,
+            "median_ms": 10.388
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -511,30 +511,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 254.92,
+          "elapsed_ms": 242.509,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
             "samples": 33,
-            "p95_ms": 12.252,
-            "max_ms": 33.284,
-            "median_ms": 5.437
+            "p95_ms": 10.684,
+            "max_ms": 31.398,
+            "median_ms": 5.472
           },
           "navigation_callback_plus_render": {
-            "samples": 5,
-            "p95_ms": 29.961,
-            "max_ms": 31.373,
-            "median_ms": 11.433
+            "samples": 4,
+            "p95_ms": 28.81,
+            "max_ms": 29.749,
+            "median_ms": 19.481
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 38.133,
-            "max_ms": 38.248,
-            "median_ms": 24.65
+            "p95_ms": 30.637,
+            "max_ms": 30.768,
+            "median_ms": 18.06
           },
           "expired": false,
-          "full_search_settle_ms": 173.267,
+          "full_search_settle_ms": 173.294,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -628,21 +628,21 @@
       },
       "cold_after": {
         "idle": {
-          "elapsed_ms": 1004.83,
+          "elapsed_ms": 1002.956,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 90,
-            "p95_ms": 30.756,
-            "max_ms": 355.42,
-            "median_ms": 5.363
+            "samples": 87,
+            "p95_ms": 13.38,
+            "max_ms": 350.698,
+            "median_ms": 5.907
           },
           "navigation_callback_plus_render": {
-            "samples": 12,
-            "p95_ms": 33.149,
-            "max_ms": 350.569,
-            "median_ms": 18.642
+            "samples": 11,
+            "p95_ms": 40.197,
+            "max_ms": 346.732,
+            "median_ms": 13.78
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -655,27 +655,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2226.991,
+          "elapsed_ms": 2241.698,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 248,
-            "p95_ms": 30.413,
-            "max_ms": 339.064,
-            "median_ms": 5.52
+            "samples": 235,
+            "p95_ms": 32.016,
+            "max_ms": 337.1,
+            "median_ms": 5.932
           },
           "navigation_callback_plus_render": {
             "samples": 32,
-            "p95_ms": 32.933,
-            "max_ms": 335.267,
-            "median_ms": 23.654
+            "p95_ms": 36.436,
+            "max_ms": 332.699,
+            "median_ms": 20.858
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 248.331,
-            "max_ms": 348.731,
-            "median_ms": 11.849
+            "p95_ms": 224.562,
+            "max_ms": 324.239,
+            "median_ms": 12.397
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -683,30 +683,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 393.216,
+          "elapsed_ms": 388.737,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
-            "samples": 9,
-            "p95_ms": 8.333,
-            "max_ms": 339.925,
-            "median_ms": 6.219
+            "samples": 8,
+            "p95_ms": 10.641,
+            "max_ms": 336.256,
+            "median_ms": 6.621
           },
           "navigation_callback_plus_render": {
             "samples": 2,
-            "p95_ms": 6.867,
-            "max_ms": 335.692,
-            "median_ms": 171.28
+            "p95_ms": 5.877,
+            "max_ms": 332.227,
+            "median_ms": 169.052
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 29.357,
-            "max_ms": 29.523,
-            "median_ms": 15.999
+            "p95_ms": 35.191,
+            "max_ms": 35.253,
+            "median_ms": 18.015
           },
           "expired": false,
-          "full_search_settle_ms": 178.126,
+          "full_search_settle_ms": 175.213,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -808,21 +808,21 @@
       },
       "after": {
         "idle": {
-          "elapsed_ms": 1008.436,
+          "elapsed_ms": 1015.826,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 106,
-            "p95_ms": 47.065,
-            "max_ms": 66.794,
-            "median_ms": 5.676
+            "samples": 102,
+            "p95_ms": 49.297,
+            "max_ms": 69.804,
+            "median_ms": 6.013
           },
           "navigation_callback_plus_render": {
             "samples": 14,
-            "p95_ms": 61.265,
-            "max_ms": 65.721,
-            "median_ms": 34.473
+            "p95_ms": 62.008,
+            "max_ms": 66.303,
+            "median_ms": 34.777
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -835,27 +835,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2211.791,
+          "elapsed_ms": 2263.356,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 227,
-            "p95_ms": 47.383,
-            "max_ms": 61.598,
-            "median_ms": 5.713
+            "samples": 225,
+            "p95_ms": 47.634,
+            "max_ms": 62.269,
+            "median_ms": 6.01
           },
           "navigation_callback_plus_render": {
-            "samples": 31,
-            "p95_ms": 51.611,
-            "max_ms": 65.055,
-            "median_ms": 25.633
+            "samples": 32,
+            "p95_ms": 50.343,
+            "max_ms": 57.473,
+            "median_ms": 32.4
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 48.255,
-            "max_ms": 68.173,
-            "median_ms": 12.258
+            "p95_ms": 45.248,
+            "max_ms": 66.582,
+            "median_ms": 12.157
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -863,30 +863,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 283.794,
+          "elapsed_ms": 256.727,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
             "samples": 24,
-            "p95_ms": 25.025,
-            "max_ms": 64.639,
-            "median_ms": 5.708
+            "p95_ms": 22.961,
+            "max_ms": 52.273,
+            "median_ms": 5.897
           },
           "navigation_callback_plus_render": {
             "samples": 4,
-            "p95_ms": 55.513,
-            "max_ms": 60.464,
-            "median_ms": 39.733
+            "p95_ms": 48.682,
+            "max_ms": 52.281,
+            "median_ms": 33.55
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 40.192,
-            "max_ms": 40.362,
-            "median_ms": 22.759
+            "p95_ms": 30.14,
+            "max_ms": 30.298,
+            "median_ms": 16.158
           },
           "expired": false,
-          "full_search_settle_ms": 179.535,
+          "full_search_settle_ms": 179.271,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -980,21 +980,21 @@
       },
       "cold_after": {
         "idle": {
-          "elapsed_ms": 1003.569,
+          "elapsed_ms": 1019.225,
           "delivered_lines": 0,
           "retained_lines": 0,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 83,
-            "p95_ms": 17.174,
-            "max_ms": 317.568,
-            "median_ms": 5.628
+            "samples": 75,
+            "p95_ms": 47.873,
+            "max_ms": 321.501,
+            "median_ms": 6.035
           },
           "navigation_callback_plus_render": {
             "samples": 11,
-            "p95_ms": 49.519,
-            "max_ms": 317.465,
-            "median_ms": 16.058
+            "p95_ms": 52.091,
+            "max_ms": 317.089,
+            "median_ms": 18.188
           },
           "worker_publication_latency": {
             "samples": 0,
@@ -1007,27 +1007,27 @@
           "tk": "9.1.0"
         },
         "sustained": {
-          "elapsed_ms": 2245.136,
+          "elapsed_ms": 2203.89,
           "delivered_lines": 2000,
           "retained_lines": 2000,
           "omitted_lines": 0,
           "heartbeat_gap": {
-            "samples": 212,
-            "p95_ms": 45.802,
-            "max_ms": 332.98,
-            "median_ms": 5.685
+            "samples": 202,
+            "p95_ms": 47.259,
+            "max_ms": 309.629,
+            "median_ms": 5.918
           },
           "navigation_callback_plus_render": {
-            "samples": 28,
-            "p95_ms": 49.22,
-            "max_ms": 328.096,
-            "median_ms": 31.095
+            "samples": 27,
+            "p95_ms": 51.668,
+            "max_ms": 307.96,
+            "median_ms": 18.246
           },
           "worker_publication_latency": {
             "samples": 200,
-            "p95_ms": 230.553,
-            "max_ms": 330.632,
-            "median_ms": 13.703
+            "p95_ms": 197.82,
+            "max_ms": 296.589,
+            "median_ms": 13.996
           },
           "expired": false,
           "payload": "2000lines/2s,10lines every10ms",
@@ -1035,30 +1035,30 @@
           "tk": "9.1.0"
         },
         "burst": {
-          "elapsed_ms": 378.089,
+          "elapsed_ms": 367.915,
           "delivered_lines": 10000,
           "retained_lines": 5000,
           "omitted_lines": 5000,
           "heartbeat_gap": {
-            "samples": 8,
-            "p95_ms": 10.991,
-            "max_ms": 323.538,
-            "median_ms": 7.908
+            "samples": 9,
+            "p95_ms": 12.738,
+            "max_ms": 308.754,
+            "median_ms": 6.029
           },
           "navigation_callback_plus_render": {
             "samples": 2,
-            "p95_ms": 7.303,
-            "max_ms": 320.078,
-            "median_ms": 163.691
+            "p95_ms": 11.855,
+            "max_ms": 305.439,
+            "median_ms": 158.647
           },
           "worker_publication_latency": {
             "samples": 100,
-            "p95_ms": 31.382,
-            "max_ms": 31.531,
-            "median_ms": 16.913
+            "p95_ms": 33.876,
+            "max_ms": 33.93,
+            "median_ms": 20.884
           },
           "expired": false,
-          "full_search_settle_ms": 180.581,
+          "full_search_settle_ms": 180.942,
           "payload": "10000lines in100 queued100linechunks",
           "rendered_line_index": "5001.0",
           "tk": "9.1.0"
@@ -1073,11 +1073,11 @@
     }
   },
   "limitations": [
-    "10,000-line burst comparison includes the approved change from unlimited history to5,000retained lines with5,000omitted notice.",
-    "Controlled scheduled navigation/queue timings are not physical mouse latency or universalFPS/hardware guarantees.",
-    "First Store mapping after non-default geometry still measured~317-355ms in this final cold run; warmed numbers do not hide it.",
-    "Largest-window warmed idle navigationp95 was61.265ms, above proposed50ms; loadnavigation remainedbelow100ms.",
-    "Full searchsettle measured~173-180ms, including150msdebounce; immediatehandler and settledresultlatencies differ.",
-    "Exceptionallylarge singlelines remain subjecttonativeTk layoutcost; nohiddenline/byte truncation."
+    "10,000-line burst comparison includes the approved change from unlimited history to5,000retained lines with5,000omittednotice.",
+    "Controlled timer/navigation/queue timings are not physicalmouse latency or universalFPS/hardware guarantees.",
+    "Cold first Store realization afternon-defaultgeometry remainsreported separately; warmruns do not hide it.",
+    "Proposed50ms idle timing maybemissedatlargegeometry; each target result is recordedratherthanblanketPASS.",
+    "Fullsearchsettle includes150msdebounce; immediateinputcallback and settledresult latenciesdiffer.",
+    "Exceptionallylarge single lines retainnativeTk layoutcost; nohiddenline/byte truncation."
   ]
 }

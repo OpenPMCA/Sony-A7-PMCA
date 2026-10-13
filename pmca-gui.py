@@ -171,8 +171,11 @@ class InfoTask(BackgroundTask):
    print('')
    from pmca.commands import usb
    fn = globals().get('infoCommand')
+   ro_fn = globals().get('getReadOnlyCameraInfo')
    if fn and fn != getattr(usb, 'infoCommand', None):
     data = fn(driverName)
+   elif ro_fn and ro_fn != getattr(usb, 'getReadOnlyCameraInfo', None):
+    data = ro_fn(driverName)
    elif hasattr(usb, 'getReadOnlyCameraInfo'):
     data = usb.getReadOnlyCameraInfo(driverName)
    else:
@@ -795,14 +798,18 @@ class MainUi(UiRoot):
   captured_serial = info.get("serial") or info.get("raw_serial") if info else None
   captured_id = (captured_model, captured_serial)
   self.fetchingInfo = True
+  self._fetchInfoDone = threading.Event()
   def worker():
    try:
     from pmca.commands import usb
+    ro_fn = globals().get('getReadOnlyCameraInfo')
     fn = globals().get('infoCommand')
-    if fn and fn != getattr(usb, 'infoCommand', None):
-     data = fn(self.driverName)
+    if ro_fn and ro_fn != getattr(usb, 'getReadOnlyCameraInfo', None):
+     data = ro_fn(self.driverName)
     elif hasattr(usb, 'getReadOnlyCameraInfo'):
      data = usb.getReadOnlyCameraInfo(self.driverName)
+    elif fn and fn != getattr(usb, 'infoCommand', None):
+     data = fn(self.driverName)
     elif hasattr(usb, 'infoCommand'):
      data = usb.infoCommand(self.driverName)
     else:
@@ -824,7 +831,10 @@ class MainUi(UiRoot):
     pass
    finally:
     self.fetchingInfo = False
-  threading.Thread(target=worker, daemon=True).start()
+    if hasattr(self, "_fetchInfoDone"):
+     self._fetchInfoDone.set()
+  self._fetchInfoThread = threading.Thread(target=worker, daemon=True)
+  self._fetchInfoThread.start()
 
  def onCameraStatusUpdate(self, info):
   appConnected = bool(info and info.get("appConnected"))
@@ -921,8 +931,10 @@ class MainUi(UiRoot):
   if self.cameraBusy:
    return
   self._cameraSessionId = getattr(self, "_cameraSessionId", 0) + 1
+  self._reconnectProbeDone = threading.Event()
   self.usbStatusVar.set("Scanning USB…")
-  threading.Thread(target=self._manualProbeWorker, daemon=True).start()
+  self._reconnectThread = threading.Thread(target=self._manualProbeWorker, daemon=True)
+  self._reconnectThread.start()
 
  def _manualProbeWorker(self):
   try:
@@ -935,6 +947,9 @@ class MainUi(UiRoot):
    self._runSafely(lambda i=info: self.onCameraStatusUpdate(i))
   except Exception as e:
    print("Manual reconnect error:", e)
+  finally:
+   if hasattr(self, "_reconnectProbeDone"):
+    self._reconnectProbeDone.set()
 
  def checkPassiveUsb(self):
   info = checkCameraConnection(self.driverName)
@@ -1255,6 +1270,9 @@ class MainUi(UiRoot):
    self._queueAfterId = self.after(delay, self._processQueue)
 
  def close(self):
+  fetch_t = getattr(self, "_fetchInfoThread", None)
+  if getattr(self, "fetchingInfo", False) and fetch_t is not None and fetch_t.is_alive():
+   fetch_t.join(timeout=0.05)
   if getattr(self, "cameraBusy", False) or getattr(self, "fetchingInfo", False) or getattr(self, "lastReportedBackendBusy", False):
    showerror("Operation in progress", "Wait for the current operation to finish before closing. If the camera is in use, keep it connected.")
    return

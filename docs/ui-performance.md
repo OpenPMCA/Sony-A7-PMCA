@@ -12,11 +12,11 @@ These controlled measurements use real Tk/Aqua widgets with fake camera, network
 
 ## Current candidate observations
 
-The warmed 10,000-line burst heartbeat maximum was approximately **1,269–1,861 ms before** and **33–65 ms after**. This includes both batching/bounded scheduling and the user-selected retention change: the new Activity history settles at 5,000 rows and explicitly reports 5,000 older rows omitted; the baseline retained all 10,000.
+The warmed 10,000-line burst heartbeat maximum was approximately **1,269–1,861 ms before** and **31–53 ms after**. This includes both batching/bounded scheduling and the user-selected retention change: the new Activity history settles at 5,000 rows and explicitly reports 5,000 older rows omitted; the baseline retained all 10,000.
 
-Warmed navigation under paced load remained below the proposed 100 ms p95 target at all sizes. The largest-window idle navigation p95 was about 61 ms, exceeding the proposed 50 ms idle target in that run. Not every proposed timing target passed; no blanket smoothness guarantee is inferred.
+Warmed navigation under paced load remained below the proposed 100 ms p95 target at all sizes. The largest-window idle navigation p95 was about 62 ms, exceeding the proposed 50 ms idle target in that run. Not every proposed timing target passed; no blanket smoothness guarantee is inferred.
 
-Cold first mapping of the complete Store after a non-default geometry change still showed about **317–355 ms** native widget realization in the new GUI, also present (slower) in the baseline. Repeated warmed interactions and log load are different from that one-time mapping cost. Preserving the existing 26-card native Store does not justify hiding it.
+Cold first mapping of the complete Store after a non-default geometry change still showed about **321–351 ms** native widget realization in the new GUI, also present (slower) in the baseline. Repeated warmed interactions and log load are different from that one-time mapping cost. Preserving the existing 26-card native Store does not justify hiding it.
 
 Search input is debounced by 150 ms and rendered in bounded chunks. Full results settled in about 173–180 ms; this deliberately trades a short wait for avoiding repeated synchronous filtering on each keystroke. Do not describe it as instantaneous results or infer a generic speedup from just the keystroke handler.
 

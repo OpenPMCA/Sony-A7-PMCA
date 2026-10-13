@@ -140,8 +140,8 @@ class InstallerReliabilityTest(unittest.TestCase):
   dev.sendSslEnd.assert_called_once_with(7)
   self.assertGreaterEqual(fake_sock.close.call_count, 1)
 
- def test_local_market_server_falls_back_to_ephemeral_port_when_4443_is_occupied(self):
-  """Verify LocalMarketServer succeeds on an ephemeral port when port 4443 is already bound."""
+ def test_local_market_server_ephemeral_port_succeeds_when_4443_is_occupied(self):
+  """Verify installer LocalMarketServer(port=0) succeeds on a non-4443 ephemeral port when 4443 is occupied."""
   cert_file = str(Path(repo_root) / 'certs/localtest.me.pem')
   blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   try:
@@ -149,14 +149,41 @@ class InstallerReliabilityTest(unittest.TestCase):
     blocker.bind(('127.0.0.1', 4443))
     blocker.listen(1)
    except OSError:
-    # Port 4443 is already occupied on this host, which still tests the fallback
+    # Port 4443 is already occupied on this host
     pass
+   with ServerContext(LocalMarketServer(cert_file, host='127.0.0.1', port=0)) as server:
+    bound_host, bound_port = server.server_address
+    self.assertEqual(bound_host, '127.0.0.1')
+    self.assertGreater(bound_port, 0)
+    self.assertNotEqual(bound_port, 4443)
+    self.assertIsNotNone(server.certChain)
+    self.assertIsNotNone(server.privateKey)
+  finally:
+   blocker.close()
+
+ def test_local_market_server_falls_back_to_ephemeral_port_when_4443_is_occupied(self):
+  """Verify LocalMarketServer default port=4443 falls back to real ephemeral port 0 on EADDRINUSE."""
+  import errno
+  import socketserver
+  cert_file = str(Path(repo_root) / 'certs/localtest.me.pem')
+  real_tcp_init = socketserver.TCPServer.__init__
+  attempted_addresses = []
+
+  def fake_first_eaddrinuse(srv, server_address, RequestHandlerClass, bind_and_activate=True):
+   attempted_addresses.append(server_address)
+   if len(attempted_addresses) == 1:
+    raise OSError(errno.EADDRINUSE, 'Address already in use')
+   return real_tcp_init(srv, server_address, RequestHandlerClass, bind_and_activate=bind_and_activate)
+
+  with patch.object(socketserver.TCPServer, '__init__', autospec=True, side_effect=fake_first_eaddrinuse):
    with ServerContext(LocalMarketServer(cert_file, host='127.0.0.1', port=4443)) as server:
     bound_host, bound_port = server.server_address
     self.assertEqual(bound_host, '127.0.0.1')
     self.assertGreater(bound_port, 0)
-  finally:
-   blocker.close()
+    self.assertIsNotNone(server.certChain)
+    self.assertIsNotNone(server.privateKey)
+
+  self.assertEqual(attempted_addresses, [('127.0.0.1', 4443), ('127.0.0.1', 0)])
 
  def test_local_market_server_reraises_non_eaddrinuse_os_error(self):
   """Verify LocalMarketServer re-raises non-EADDRINUSE errors such as EACCES or invalid address."""

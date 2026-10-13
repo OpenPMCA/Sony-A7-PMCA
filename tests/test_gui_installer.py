@@ -633,9 +633,10 @@ class GuiInstallerTest(unittest.TestCase):
    root.withdraw()
    threading.Thread(target=root._cameraMonitorWorker, daemon=True).start()
    start = time.time()
-   while not root.cameraConnected and time.time() - start < 2.0:
+   while not root.cameraConnected and time.time() - start < 3.0:
+    root._processQueue()
     root.update()
-    time.sleep(0.05)
+    time.sleep(0.02)
    self.assertTrue(root.cameraConnected)
    self.assertIn('Connected: ILCE-7', root.usbStatusVar.get())
    self.assertEqual(root.infoFrame.infoVars['Model'].get(), 'ILCE-7')
@@ -648,6 +649,9 @@ class GuiInstallerTest(unittest.TestCase):
    valid_apk.write_bytes(apkFixture(signed=True))
    root.installerFrame.setApkFile(str(valid_apk))
    self.assertEqual(str(root.installerFrame.installButton['state']), 'normal')
+   if hasattr(root, '_fetchInfoDone'):
+    root._fetchInfoDone.wait(timeout=2.0)
+   root._processQueue()
    root.close()
 
  def test_reconnect_button_transition_disconnected_to_ready(self):
@@ -675,16 +679,22 @@ class GuiInstallerTest(unittest.TestCase):
    root.update()
    self.assertFalse(root.cameraConnected)
    self.assertIn('Disconnected', root.usbStatusVar.get())
-   
+
    check_mock.return_value = ready_info
    root.reconnectButton.invoke()
+   if hasattr(root, '_reconnectProbeDone'):
+    self.assertTrue(root._reconnectProbeDone.wait(timeout=5.0))
    start = time.time()
-   while not root.cameraConnected and time.time() - start < 2.0:
+   while not root.cameraConnected and time.time() - start < 3.0:
+    root._processQueue()
     root.update()
-    time.sleep(0.05)
+    time.sleep(0.02)
    self.assertTrue(root.cameraConnected)
    self.assertIn('Connected: ILCE-7', root.usbStatusVar.get())
    self.assertEqual(root.infoFrame.infoVars['Model'].get(), 'ILCE-7')
+   if hasattr(root, '_fetchInfoDone'):
+    root._fetchInfoDone.wait(timeout=2.0)
+   root._processQueue()
    root.close()
 
 
