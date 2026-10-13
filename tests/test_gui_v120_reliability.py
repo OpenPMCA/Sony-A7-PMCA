@@ -37,6 +37,7 @@ class GuiV120ReliabilityTest(unittest.TestCase):
   p_sync = patch.object(self.gui["InstallerFrame"], "startBackgroundSync")
   p_ro = patch("pmca.commands.usb.getReadOnlyCameraInfo", Mock(return_value=None))
   p_ic = patch("pmca.commands.usb.infoCommand", Mock(return_value=None))
+  p_chk = patch("pmca.commands.usb.checkCameraConnection", Mock(return_value=None))
   p_dict = patch.dict(self.gui, {
    "infoCommand": Mock(return_value=None),
    "getReadOnlyCameraInfo": Mock(return_value=None),
@@ -53,6 +54,7 @@ class GuiV120ReliabilityTest(unittest.TestCase):
   p_sync.start()
   p_ro.start()
   p_ic.start()
+  p_chk.start()
   p_dict.start()
   root = self.gui["MainUi"](title, installerOnly=True)
   root.withdraw()
@@ -74,16 +76,23 @@ class GuiV120ReliabilityTest(unittest.TestCase):
     root.fetchingInfo = False
    if hasattr(root, "lastReportedBackendBusy"):
     root.lastReportedBackendBusy = False
+   for t_name in ("_fetchInfoThread", "_reconnectThread"):
+    t = getattr(root, t_name, None)
+    if t and t.is_alive():
+     t.join(timeout=1.0)
    try:
-    root.close()
+    root.destroy()
    except Exception:
     pass
    p_dict.stop()
+   p_chk.stop()
    p_ic.stop()
    p_ro.stop()
    p_sync.stop()
    p_mon.stop()
    sys.stdout, sys.stderr = orig_streams
+   import gc
+   gc.collect()
 
   self.addCleanup(cleanup)
   return root

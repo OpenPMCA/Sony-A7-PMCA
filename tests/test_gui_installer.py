@@ -50,12 +50,39 @@ class GuiInstallerTest(unittest.TestCase):
   self.mock_ro_usb = patch('pmca.commands.usb.getReadOnlyCameraInfo', Mock(return_value=None))
   self.mock_ro_usb.start()
   self.addCleanup(self.mock_ro_usb.stop)
+  self.mock_check_usb = patch('pmca.commands.usb.checkCameraConnection', Mock(return_value=None))
+  self.mock_check_usb.start()
+  self.addCleanup(self.mock_check_usb.stop)
+  self.mock_info_usb = patch('pmca.commands.usb.infoCommand', Mock(return_value=None))
+  self.mock_info_usb.start()
+  self.addCleanup(self.mock_info_usb.stop)
   self.mock_bg_sync = patch.object(self.gui['InstallerFrame'], 'startBackgroundSync', Mock())
   self.mock_bg_sync.start()
   self.addCleanup(self.mock_bg_sync.stop)
   self.mock_camera_mon = patch.object(self.gui['MainUi'], 'startCameraMonitor', Mock())
   self.mock_camera_mon.start()
   self.addCleanup(self.mock_camera_mon.stop)
+
+  self.test_roots = []
+  def cleanup_test_roots():
+   for root in list(self.test_roots):
+    try:
+     if not getattr(root, '_closed', False):
+      root.cameraBusy = False
+      root.downloadBusy = False
+      root.fetchingInfo = False
+      root.lastReportedBackendBusy = False
+      for t_name in ('_fetchInfoThread', '_reconnectThread'):
+       t = getattr(root, t_name, None)
+       if t and t.is_alive():
+        t.join(timeout=1.0)
+      root.destroy()
+    except Exception:
+     pass
+   self.test_roots.clear()
+   import gc
+   gc.collect()
+  self.addCleanup(cleanup_test_roots)
 
  def test_empty_apk_selection_does_not_start_installation(self):
   self.ui.getSelectedApk.return_value = ''
@@ -627,11 +654,13 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)),        patch.dict(self.gui, {
         'checkCameraConnection': Mock(return_value=ready_info),
         'syncCatalogMetadata': Mock(return_value=({}, False)),
-       }):
+       }),        patch('pmca.commands.usb.checkCameraConnection', Mock(return_value=ready_info)):
    import threading
    root = self.gui['MainUi']('Test Startup', installerOnly=True)
+   self.test_roots.append(root)
    root.withdraw()
-   threading.Thread(target=root._cameraMonitorWorker, daemon=True).start()
+   mon_thread = threading.Thread(target=root._cameraMonitorWorker, daemon=True)
+   mon_thread.start()
    start = time.time()
    while not root.cameraConnected and time.time() - start < 3.0:
     root._processQueue()
@@ -649,8 +678,10 @@ class GuiInstallerTest(unittest.TestCase):
    valid_apk.write_bytes(apkFixture(signed=True))
    root.installerFrame.setApkFile(str(valid_apk))
    self.assertEqual(str(root.installerFrame.installButton['state']), 'normal')
-   if hasattr(root, '_fetchInfoDone'):
-    root._fetchInfoDone.wait(timeout=2.0)
+   root.abortMonitor.set()
+   mon_thread.join(timeout=1.0)
+   if hasattr(root, '_fetchInfoThread') and root._fetchInfoThread.is_alive():
+    root._fetchInfoThread.join(timeout=1.0)
    root._processQueue()
    root.close()
 
@@ -673,8 +704,9 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)),        patch.dict(self.gui, {
         'checkCameraConnection': check_mock,
         'syncCatalogMetadata': Mock(return_value=({}, False)),
-       }):
+       }),        patch('pmca.commands.usb.checkCameraConnection', check_mock):
    root = self.gui['MainUi']('Test Reconnect', installerOnly=True)
+   self.test_roots.append(root)
    root.withdraw()
    root.update()
    self.assertFalse(root.cameraConnected)
@@ -684,6 +716,8 @@ class GuiInstallerTest(unittest.TestCase):
    root.reconnectButton.invoke()
    if hasattr(root, '_reconnectProbeDone'):
     self.assertTrue(root._reconnectProbeDone.wait(timeout=5.0))
+   if hasattr(root, '_reconnectThread') and root._reconnectThread.is_alive():
+    root._reconnectThread.join(timeout=1.0)
    start = time.time()
    while not root.cameraConnected and time.time() - start < 3.0:
     root._processQueue()
@@ -692,14 +726,15 @@ class GuiInstallerTest(unittest.TestCase):
    self.assertTrue(root.cameraConnected)
    self.assertIn('Connected: ILCE-7', root.usbStatusVar.get())
    self.assertEqual(root.infoFrame.infoVars['Model'].get(), 'ILCE-7')
-   if hasattr(root, '_fetchInfoDone'):
-    root._fetchInfoDone.wait(timeout=2.0)
+   if hasattr(root, '_fetchInfoThread') and root._fetchInfoThread.is_alive():
+    root._fetchInfoThread.join(timeout=1.0)
    root._processQueue()
    root.close()
 
 
  def test_camera_snapshot_merge_across_heartbeat_detail_and_disconnect(self):
   root = self.gui['MainUi']('Test Snapshot Merge', installerOnly=True)
+  self.test_roots.append(root)
   root.withdraw()
   info_frame = root.infoFrame
 
@@ -793,6 +828,7 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)), \
        patch.dict(self.gui, {'checkCameraConnection': Mock(return_value=None)}):
    root = self.gui['MainUi']('Test Scroll and Headings', installerOnly=True)
+   self.test_roots.append(root)
    root.update()
    frame = root.installerFrame
    frame.update_idletasks()
@@ -831,6 +867,7 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)), \
        patch.dict(self.gui, {'checkCameraConnection': Mock(return_value=None)}):
    root = self.gui['MainUi']('Test 960x640 Buttons & Identity Change', installerOnly=True)
+   self.test_roots.append(root)
    root.geometry("960x640")
    root.update()
 
@@ -917,6 +954,7 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)), \
        patch.dict(self.gui, {'checkCameraConnection': Mock(return_value=None)}):
    root = self.gui['MainUi']('Test Native TouchpadScroll', installerOnly=True)
+   self.test_roots.append(root)
    root.update()
 
    frame = root.installerFrame
@@ -979,6 +1017,7 @@ class GuiInstallerTest(unittest.TestCase):
   with patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)), \
        patch.dict(self.gui, {'checkCameraConnection': Mock(return_value=None)}):
    root = self.gui['MainUi']('Test Coalescing', installerOnly=True)
+   self.test_roots.append(root)
    root.update()
    frame = root.installerFrame
    frame.update_idletasks()

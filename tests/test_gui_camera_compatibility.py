@@ -43,11 +43,38 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    }),
    patch('pmca.commands.usb.getReadOnlyCameraInfo', self.mock_read_only),
    patch('pmca.commands.usb.infoCommand', self.mock_info_cmd),
+   patch('pmca.commands.usb.checkCameraConnection', Mock(return_value=None)),
    patch('pmca.appstore.catalog.syncCatalogMetadata', return_value=({}, False)),
   ]
   for p in self.patches:
    p.start()
    self.addCleanup(p.stop)
+
+  self.test_roots = []
+  def cleanup_test_roots():
+   for root in list(self.test_roots):
+    try:
+     if not getattr(root, '_closed', False):
+      root.cameraBusy = False
+      root.downloadBusy = False
+      root.fetchingInfo = False
+      root.lastReportedBackendBusy = False
+      for t_name in ('_fetchInfoThread', '_reconnectThread'):
+       t = getattr(root, t_name, None)
+       if t and t.is_alive():
+        t.join(timeout=1.0)
+      root.destroy()
+    except Exception:
+     pass
+   self.test_roots.clear()
+   import gc
+   gc.collect()
+  self.addCleanup(cleanup_test_roots)
+
+ def make_root(self, *args, **kwargs):
+  root = self.gui['MainUi'](*args, **kwargs)
+  self.test_roots.append(root)
+  return root
 
  def _ready_info(self, model='ILCE-7', app_supported=True, reason=None, mode='MTP',
                  tested=None, shutter_layout=None, busy=False, operations=None):
@@ -87,7 +114,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
 
  def test_positive_alpha_a_model_enables_install_when_apk_selected(self):
   info = self._ready_info('ILCE-7', app_supported=True, tested=True)
-  root = self.gui['MainUi']('Test ILCE-7', installerOnly=True)
+  root = self.make_root('Test ILCE-7', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -115,7 +142,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
 
  def test_positive_alpha_b_model_supported_reference_model(self):
   info = self._ready_info('ILCE-7RM2', app_supported=True, tested=False, shutter_layout='tag9050b')
-  root = self.gui['MainUi']('Test ILCE-7RM2', installerOnly=True)
+  root = self.make_root('Test ILCE-7RM2', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -132,7 +159,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   for model in ['NEX-5R', 'DSC-HX60', 'DSC-RX100M4']:
    with self.subTest(model=model):
     info = self._ready_info(model, app_supported=True, tested=False)
-    root = self.gui['MainUi']('Test ' + model, installerOnly=True)
+    root = self.make_root('Test ' + model, installerOnly=True)
     root.withdraw()
     root.onCameraStatusUpdate(info)
     root.update()
@@ -144,7 +171,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
  def test_known_unsupported_non_pmca_body_keeps_info_enabled_but_disables_install(self):
   reason = 'This model is not listed as PMCA app-capable in the upstream device reference.'
   info = self._ready_info('ILCE-7M3', app_supported=False, reason=reason, tested=False)
-  root = self.gui['MainUi']('Test ILCE-7M3', installerOnly=True)
+  root = self.make_root('Test ILCE-7M3', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -185,7 +212,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
         'showerror': mock_error,
         'askyesno': mock_confirm,
        }):
-   root = self.gui['MainUi']('Test Install Veto', installerOnly=True)
+   root = self.make_root('Test Install Veto', installerOnly=True)
    root.withdraw()
    root.onCameraStatusUpdate(info)
    root.update()
@@ -205,7 +232,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
  def test_supported_model_with_missing_vendor_operations_disables_install(self):
   reason = 'The camera model is PMCA-capable, but the required Sony transport commands are unavailable.'
   info = self._ready_info('ILCE-7', app_supported=False, reason=reason, operations=[0x1001, 0x1002])
-  root = self.gui['MainUi']('Test Missing Ops', installerOnly=True)
+  root = self.make_root('Test Missing Ops', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -222,7 +249,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
  def test_genuine_app_installer_protocol_confirms_unlisted_model(self):
   info = self._ready_info('ILCE-UNKNOWN', app_supported=True, mode='App installation',
                           reason='Sony app-installer protocol confirmed.')
-  root = self.gui['MainUi']('Test App Install Protocol', installerOnly=True)
+  root = self.make_root('Test App Install Protocol', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -239,7 +266,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
  def test_unconfirmed_unknown_model_in_normal_mtp_disables_install(self):
   reason = 'PMCA app support is unconfirmed for this model; no installer protocol is active.'
   info = self._ready_info('ILCE-UNKNOWN', app_supported=False, reason=reason)
-  root = self.gui['MainUi']('Test Unknown Model', installerOnly=True)
+  root = self.make_root('Test Unknown Model', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -265,7 +292,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    'vendor': 'Sony (0x054c)',
    'serial': '12345678',
   }
-  root = self.gui['MainUi']('Test Missing Support Flag Fails Closed', installerOnly=True)
+  root = self.make_root('Test Missing Support Flag Fails Closed', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
@@ -279,7 +306,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.close()
 
  def test_transition_a7_to_7rm2_to_7m3_with_same_root(self):
-  root = self.gui['MainUi']('Test Model Transitions', installerOnly=True)
+  root = self.make_root('Test Model Transitions', installerOnly=True)
   root.withdraw()
   root.update()
   root.installerFrame.setApkFile(str(self.apk_path))
@@ -332,7 +359,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.close()
 
  def test_backend_busy_state_blocks_install_without_deadlocking_monitor(self):
-  root = self.gui['MainUi']('Test Backend Busy', installerOnly=True)
+  root = self.make_root('Test Backend Busy', installerOnly=True)
   root.withdraw()
   root.update()
   root.installerFrame.setApkFile(str(self.apk_path))
@@ -366,7 +393,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    'failure_reason': 'Multiple Sony cameras detected. Connect only one Sony camera at a time.',
    'app_installation_supported': False,
   }
-  root = self.gui['MainUi']('Test Multiple Devices', installerOnly=True)
+  root = self.make_root('Test Multiple Devices', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info_multi)
   root.update()
@@ -382,7 +409,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   data_cam1 = {'Model': 'ILCE-7', 'Lens': 'Old Lens 50mm'}
   data_cam2 = {'Model': 'ILCE-7RM2', 'Lens': 'New Lens 24-70mm'}
 
-  root = self.gui['MainUi']('Test Identity Guard', installerOnly=True)
+  root = self.make_root('Test Identity Guard', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -425,7 +452,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.close()
 
  def test_camera_transition_same_model_different_descriptor_does_not_leak_details(self):
-  root = self.gui['MainUi']('Test Same Model Descriptor Diff', installerOnly=True)
+  root = self.make_root('Test Same Model Descriptor Diff', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -471,7 +498,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.close()
 
  def test_transport_serial_not_mislabeled_as_body_serial(self):
-  root = self.gui['MainUi']('Test Transport Serial', installerOnly=True)
+  root = self.make_root('Test Transport Serial', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -490,7 +517,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   root.close()
 
  def test_shutter_counter_unsupported_and_unconfirmed_concise_reasons(self):
-  root = self.gui['MainUi']('Test Shutter Reasons', installerOnly=True)
+  root = self.make_root('Test Shutter Reasons', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -538,7 +565,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    'USB mode': 'MTP',
   }
 
-  root = self.gui['MainUi']('Test Unsupported Diagnostics', installerOnly=True)
+  root = self.make_root('Test Unsupported Diagnostics', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info_7m3)
   root.update()
@@ -585,7 +612,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    ('1.2.0', patch.dict(self.gui, {'version': '1.2.0'})),
   ]:
    with self.subTest(version=expected_ver), patch_ctx:
-    root = self.gui['MainUi']('Test Version Presentation', installerOnly=True)
+    root = self.make_root('Test Version Presentation', installerOnly=True)
     root.withdraw()
     root.update()
 
@@ -607,7 +634,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
     root.close()
 
  def test_close_and_destroy_cancels_pending_queue_timer_and_aborts_workers(self):
-  root = self.gui['MainUi']('Test Timer Cancellation', installerOnly=True)
+  root = self.make_root('Test Timer Cancellation', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -627,7 +654,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   self.assertIsNone(root._queueAfterId)
 
  def test_process_queue_logs_traceback_on_callback_crash_and_continues_processing(self):
-  root = self.gui['MainUi']('Test Queue Robustness', installerOnly=True)
+  root = self.make_root('Test Queue Robustness', installerOnly=True)
   root.withdraw()
   root.update()
 
@@ -665,7 +692,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
         'showerror': mock_error,
         'askyesno': mock_confirm,
        }):
-   root = self.gui['MainUi']('Test Install Busy Veto', installerOnly=True)
+   root = self.make_root('Test Install Busy Veto', installerOnly=True)
    root.withdraw()
    root.onCameraStatusUpdate(info)
    root.installerFrame.setApkFile(str(self.apk_path))
