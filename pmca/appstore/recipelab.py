@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import certifi
 
 from ..apk import ApkParser
+from ..util.http import DownloadCancelledError
 
 
 class HttpsRedirectHandler(request.HTTPRedirectHandler):
@@ -17,8 +18,10 @@ class HttpsRedirectHandler(request.HTTPRedirectHandler):
   return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def downloadRecipeLab(filename, progress=None):
+def downloadRecipeLab(filename, progress=None, abort_event=None):
  """Download and validate RecipeLab; never install it or contact a camera."""
+ if abort_event is not None and abort_event.is_set():
+  raise DownloadCancelledError('RecipeLab download cancelled')
  path = os.path.abspath(filename)
  context = ssl.create_default_context(cafile=certifi.where())
  opener = request.build_opener(HttpsRedirectHandler(), request.HTTPSHandler(context=context))
@@ -28,6 +31,8 @@ def downloadRecipeLab(filename, progress=None):
   headers=dict(headers, Accept='application/vnd.github+json'))
  with opener.open(api, timeout=30) as response:
   release = json.load(response)
+ if abort_event is not None and abort_event.is_set():
+  raise DownloadCancelledError('RecipeLab download cancelled')
  if release.get('draft') or release.get('prerelease'):
   raise ValueError('No latest stable RecipeLab release available')
  version = release['tag_name']
@@ -52,13 +57,19 @@ def downloadRecipeLab(filename, progress=None):
     length = response.headers.get('Content-Length')
     total = int(length) if length is not None else None
     while True:
+     if abort_event is not None and abort_event.is_set():
+      raise DownloadCancelledError('RecipeLab download cancelled')
      data = response.read(64 * 1024)
      if not data:
       break
+     if abort_event is not None and abort_event.is_set():
+      raise DownloadCancelledError('RecipeLab download cancelled')
      file.write(data)
      downloaded += len(data)
      if progress is not None:
       progress(downloaded, total)
+   if abort_event is not None and abort_event.is_set():
+    raise DownloadCancelledError('RecipeLab download cancelled')
    if total is not None and downloaded != total:
     raise ValueError('Incomplete RecipeLab APK download')
    file.flush()
@@ -76,9 +87,14 @@ def downloadRecipeLab(filename, progress=None):
      raise ValueError('RecipeLab APK signature certificate is empty')
    except Exception as e:
     raise ValueError('RecipeLab APK signature certificate missing or invalid: %s' % e)
+   if abort_event is not None and abort_event.is_set():
+    raise DownloadCancelledError('RecipeLab download cancelled')
   os.replace(partial, path)
   partial = None
   return {'path': path, 'version': version, 'package': package, 'bytes': downloaded}
  finally:
-  if partial is not None:
-   os.unlink(partial)
+  if partial is not None and os.path.exists(partial):
+   try:
+    os.unlink(partial)
+   except OSError:
+    pass

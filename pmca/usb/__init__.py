@@ -40,21 +40,26 @@ class MscDevice(UsbDevice):
  SONY_SENSE_NOT_FOUND = (0x05, 0x24, 0x00)
 
  def _checkResponse(self, response):
-  if response.status != 0:
-   if response.sense == self.SONY_SENSE_NOT_FOUND:
+  if response != MSC_SENSE_OK:
+   if response == self.SONY_SENSE_NOT_FOUND:
     raise InvalidCommandException()
    else:
-    raise UnknownMscException('SCSI sense %x %x %x' % response.sense)
+    raise UnknownMscException('SCSI sense %x %x %x' % response)
 
  def _sendInquiryCommand(self, length):
-  response, data = self.driver.sendReadCommand(b'\x12' + b'\0\0' + dump8(length) + b'\0', length, self.DEFAULT_TIMEOUT)
+  response, data = self.driver.sendReadCommand(b'\x12' + 3*b'\0' + dump8(length) + b'\0', length)
   self._checkResponse(response)
   return data
 
  def getDeviceInfo(self):
   """SCSI Inquiry command"""
-  l = 5 + parse8(self._sendInquiryCommand(5)[4:5])
+  initial = self._sendInquiryCommand(5)
+  if len(initial) < 5:
+   raise MscException('Truncated SCSI Inquiry response (got %d bytes, expected at least 5)' % len(initial))
+  l = 5 + parse8(initial[4:5])
   data = self._sendInquiryCommand(l)
+  if len(data) < 32:
+   raise MscException('Truncated SCSI Inquiry response (got %d bytes, expected at least 32)' % len(data))
 
   vendor = data[8:16].decode('latin1').rstrip(' \0')
   product = data[16:32].decode('latin1').rstrip(' \0')

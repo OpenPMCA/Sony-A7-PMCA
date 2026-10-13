@@ -33,17 +33,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def get_version() -> str:
     """Read version from pmca package."""
+    sys_path_added = str(REPO_ROOT) not in sys.path
+    if sys_path_added:
+        sys.path.insert(0, str(REPO_ROOT))
     try:
-        sys_path_added = False
-        if str(REPO_ROOT) not in sys.path:
-            sys.path.insert(0, str(REPO_ROOT))
-            sys_path_added = True
         from pmca import __version__ as ver
-        if sys_path_added:
-            sys.path.pop(0)
         return ver
-    except Exception:
-        return "1.1.0"
+    except Exception as error:
+        raise RuntimeError("Cannot read application version") from error
+    finally:
+        if sys_path_added:
+            sys.path.remove(str(REPO_ROOT))
 
 
 def normalize_arch(arch: str) -> str:

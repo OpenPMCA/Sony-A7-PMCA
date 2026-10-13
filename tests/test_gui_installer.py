@@ -41,12 +41,21 @@ class GuiInstallerTest(unittest.TestCase):
   self.patches = patch.dict(self.gui, {
    'installCommand': self.install, 'askyesno': self.confirm,
    'showerror': self.error,
+   'checkCameraConnection': Mock(return_value=None),
+   'infoCommand': Mock(return_value=None),
+   'getReadOnlyCameraInfo': Mock(return_value=None),
   })
   self.patches.__enter__()
   self.addCleanup(self.patches.__exit__, None, None, None)
+  self.mock_ro_usb = patch('pmca.commands.usb.getReadOnlyCameraInfo', Mock(return_value=None))
+  self.mock_ro_usb.start()
+  self.addCleanup(self.mock_ro_usb.stop)
   self.mock_bg_sync = patch.object(self.gui['InstallerFrame'], 'startBackgroundSync', Mock())
   self.mock_bg_sync.start()
   self.addCleanup(self.mock_bg_sync.stop)
+  self.mock_camera_mon = patch.object(self.gui['MainUi'], 'startCameraMonitor', Mock())
+  self.mock_camera_mon.start()
+  self.addCleanup(self.mock_camera_mon.stop)
 
  def test_empty_apk_selection_does_not_start_installation(self):
   self.ui.getSelectedApk.return_value = ''
@@ -606,6 +615,7 @@ class GuiInstallerTest(unittest.TestCase):
    'connected': True,
    'physicalDetected': True,
    'appConnected': True,
+   'app_installation_supported': True,
    'status': 'ready',
    'mode': 'MTP',
    'name': 'ILCE-7',
@@ -618,8 +628,10 @@ class GuiInstallerTest(unittest.TestCase):
         'checkCameraConnection': Mock(return_value=ready_info),
         'syncCatalogMetadata': Mock(return_value=({}, False)),
        }):
+   import threading
    root = self.gui['MainUi']('Test Startup', installerOnly=True)
    root.withdraw()
+   threading.Thread(target=root._cameraMonitorWorker, daemon=True).start()
    start = time.time()
    while not root.cameraConnected and time.time() - start < 2.0:
     root.update()
@@ -644,6 +656,7 @@ class GuiInstallerTest(unittest.TestCase):
    'connected': True,
    'physicalDetected': True,
    'appConnected': True,
+   'app_installation_supported': True,
    'status': 'ready',
    'mode': 'MTP',
    'name': 'ILCE-7',

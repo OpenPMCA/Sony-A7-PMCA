@@ -1,0 +1,1083 @@
+{
+  "version": "1.2.0",
+  "measurement_date": "2026-10-13",
+  "baseline_commit": "202a4bce79ee498d7a0e6cd5c8fb7799c56bf7a6",
+  "candidate": "Final review-fixed v1.2.0 source before native artifact build",
+  "environment": {
+    "host": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.8",
+    "tcl_tk": "9.1.0",
+    "providers": "Mocked camera/network/cache/dialog with real native Tk widgets"
+  },
+  "methods": {
+    "cold_map": "Real Tk mainloop with500ms equal warmup; producer uses only queue.run, no manual _processQueue; paced10lines/10ms over2s; heartbeat tail retained; navigation includes timerlateness+callbackpaint; filters awaitallchunks",
+    "warmed": "Real Tk mainloop with500ms windowwarmup+both-tabs250ms realization warmup; producer uses only queue.run, no manual _processQueue; paced10lines/10ms over2s; heartbeat tail retained; navigation includes timerlateness+callbackpaint; filters awaitallchunks"
+  },
+  "source_sha256": "10f773c2e318121e4fa453e5de0d150ad112e492dad8913035fcd1e7b0ef8e33",
+  "results": {
+    "1160x760": {
+      "before": {
+        "idle": {
+          "elapsed_ms": 1002.646,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 113,
+            "p95_ms": 41.106,
+            "max_ms": 52.93,
+            "median_ms": 5.734
+          },
+          "navigation_callback_plus_render": {
+            "samples": 15,
+            "p95_ms": 51.162,
+            "max_ms": 51.225,
+            "median_ms": 18.863
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2212.127,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 220,
+            "p95_ms": 36.821,
+            "max_ms": 51.915,
+            "median_ms": 5.706
+          },
+          "navigation_callback_plus_render": {
+            "samples": 34,
+            "p95_ms": 38.078,
+            "max_ms": 73.851,
+            "median_ms": 24.209
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 101.269,
+            "max_ms": 110.205,
+            "median_ms": 52.149
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 1813.55,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 31,
+            "p95_ms": 34.516,
+            "max_ms": 1572.004,
+            "median_ms": 5.644
+          },
+          "navigation_callback_plus_render": {
+            "samples": 4,
+            "p95_ms": 33.512,
+            "max_ms": 1599.69,
+            "median_ms": 23.327
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 1506.066,
+            "max_ms": 1580.852,
+            "median_ms": 833.508
+          },
+          "expired": false,
+          "full_search_settle_ms": 28.156,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "after": {
+        "idle": {
+          "elapsed_ms": 1004.587,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 116,
+            "p95_ms": 36.704,
+            "max_ms": 60.332,
+            "median_ms": 5.68
+          },
+          "navigation_callback_plus_render": {
+            "samples": 15,
+            "p95_ms": 49.269,
+            "max_ms": 57.857,
+            "median_ms": 19.607
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2212.95,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 269,
+            "p95_ms": 35.638,
+            "max_ms": 50.174,
+            "median_ms": 5.68
+          },
+          "navigation_callback_plus_render": {
+            "samples": 34,
+            "p95_ms": 40.77,
+            "max_ms": 45.683,
+            "median_ms": 25.374
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 34.763,
+            "max_ms": 51.061,
+            "median_ms": 10.503
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 242.292,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 24,
+            "p95_ms": 16.708,
+            "max_ms": 54.48,
+            "median_ms": 5.609
+          },
+          "navigation_callback_plus_render": {
+            "samples": 4,
+            "p95_ms": 37.744,
+            "max_ms": 49.227,
+            "median_ms": 26.614
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 29.664,
+            "max_ms": 29.707,
+            "median_ms": 17.976
+          },
+          "expired": false,
+          "full_search_settle_ms": 175.32,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_before": {
+        "idle": {
+          "elapsed_ms": 1018.757,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 120,
+            "p95_ms": 35.616,
+            "max_ms": 45.995,
+            "median_ms": 5.742
+          },
+          "navigation_callback_plus_render": {
+            "samples": 16,
+            "p95_ms": 38.449,
+            "max_ms": 45.116,
+            "median_ms": 27.992
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2235.351,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 228,
+            "p95_ms": 35.081,
+            "max_ms": 47.136,
+            "median_ms": 5.702
+          },
+          "navigation_callback_plus_render": {
+            "samples": 35,
+            "p95_ms": 38.483,
+            "max_ms": 42.13,
+            "median_ms": 24.108
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 100.997,
+            "max_ms": 110.718,
+            "median_ms": 55.297
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 1878.239,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 35,
+            "p95_ms": 38.993,
+            "max_ms": 1546.377,
+            "median_ms": 5.734
+          },
+          "navigation_callback_plus_render": {
+            "samples": 6,
+            "p95_ms": 54.55,
+            "max_ms": 1521.527,
+            "median_ms": 36.77
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 1549.598,
+            "max_ms": 1625.318,
+            "median_ms": 865.967
+          },
+          "expired": false,
+          "full_search_settle_ms": 17.819,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_after": {
+        "idle": {
+          "elapsed_ms": 1004.511,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 119,
+            "p95_ms": 38.806,
+            "max_ms": 49.429,
+            "median_ms": 5.622
+          },
+          "navigation_callback_plus_render": {
+            "samples": 15,
+            "p95_ms": 44.37,
+            "max_ms": 47.886,
+            "median_ms": 33.728
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2243.003,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 276,
+            "p95_ms": 36.181,
+            "max_ms": 44.905,
+            "median_ms": 5.635
+          },
+          "navigation_callback_plus_render": {
+            "samples": 35,
+            "p95_ms": 38.575,
+            "max_ms": 41.231,
+            "median_ms": 15.949
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 33.888,
+            "max_ms": 44.326,
+            "median_ms": 10.654
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 244.257,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 29,
+            "p95_ms": 16.29,
+            "max_ms": 43.175,
+            "median_ms": 5.707
+          },
+          "navigation_callback_plus_render": {
+            "samples": 4,
+            "p95_ms": 20.861,
+            "max_ms": 42.372,
+            "median_ms": 17.919
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 37.245,
+            "max_ms": 37.377,
+            "median_ms": 21.58
+          },
+          "expired": false,
+          "full_search_settle_ms": 178.567,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "targets": {
+        "warmed_loaded_navigation_p95_under100ms": true,
+        "warmed_log_burst_heartbeat_under250ms": true,
+        "idle_navigation_p95_under50ms": true,
+        "retained_log_limit_and_omission_count": true
+      }
+    },
+    "960x640": {
+      "before": {
+        "idle": {
+          "elapsed_ms": 1004.204,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 125,
+            "p95_ms": 29.575,
+            "max_ms": 49.771,
+            "median_ms": 5.712
+          },
+          "navigation_callback_plus_render": {
+            "samples": 16,
+            "p95_ms": 42.84,
+            "max_ms": 49.916,
+            "median_ms": 21.948
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2221.389,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 262,
+            "p95_ms": 26.955,
+            "max_ms": 53.465,
+            "median_ms": 5.728
+          },
+          "navigation_callback_plus_render": {
+            "samples": 38,
+            "p95_ms": 29.738,
+            "max_ms": 53.047,
+            "median_ms": 19.425
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 97.391,
+            "max_ms": 106.756,
+            "median_ms": 50.788
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 1574.267,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 35,
+            "p95_ms": 30.387,
+            "max_ms": 1269.042,
+            "median_ms": 5.673
+          },
+          "navigation_callback_plus_render": {
+            "samples": 6,
+            "p95_ms": 50.625,
+            "max_ms": 1242.998,
+            "median_ms": 28.028
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 1284.164,
+            "max_ms": 1345.743,
+            "median_ms": 734.204
+          },
+          "expired": false,
+          "full_search_settle_ms": 16.982,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "after": {
+        "idle": {
+          "elapsed_ms": 1004.83,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 131,
+            "p95_ms": 29.13,
+            "max_ms": 52.22,
+            "median_ms": 5.644
+          },
+          "navigation_callback_plus_render": {
+            "samples": 17,
+            "p95_ms": 37.727,
+            "max_ms": 50.65,
+            "median_ms": 15.696
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2199.057,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 288,
+            "p95_ms": 29.781,
+            "max_ms": 40.694,
+            "median_ms": 5.579
+          },
+          "navigation_callback_plus_render": {
+            "samples": 36,
+            "p95_ms": 34.092,
+            "max_ms": 39.166,
+            "median_ms": 20.173
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 31.734,
+            "max_ms": 40.2,
+            "median_ms": 9.786
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 254.92,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 33,
+            "p95_ms": 12.252,
+            "max_ms": 33.284,
+            "median_ms": 5.437
+          },
+          "navigation_callback_plus_render": {
+            "samples": 5,
+            "p95_ms": 29.961,
+            "max_ms": 31.373,
+            "median_ms": 11.433
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 38.133,
+            "max_ms": 38.248,
+            "median_ms": 24.65
+          },
+          "expired": false,
+          "full_search_settle_ms": 173.267,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_before": {
+        "idle": {
+          "elapsed_ms": 1015.795,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 74,
+            "p95_ms": 30.902,
+            "max_ms": 463.78,
+            "median_ms": 5.71
+          },
+          "navigation_callback_plus_render": {
+            "samples": 10,
+            "p95_ms": 39.672,
+            "max_ms": 463.655,
+            "median_ms": 20.085
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2236.807,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 198,
+            "p95_ms": 29.784,
+            "max_ms": 477.023,
+            "median_ms": 5.66
+          },
+          "navigation_callback_plus_render": {
+            "samples": 30,
+            "p95_ms": 37.38,
+            "max_ms": 472.076,
+            "median_ms": 27.324
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 437.129,
+            "max_ms": 526.905,
+            "median_ms": 66.517
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 1952.529,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 37,
+            "p95_ms": 30.956,
+            "max_ms": 1224.158,
+            "median_ms": 5.687
+          },
+          "navigation_callback_plus_render": {
+            "samples": 6,
+            "p95_ms": 474.005,
+            "max_ms": 1195.342,
+            "median_ms": 27.657
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 1665.592,
+            "max_ms": 1727.249,
+            "median_ms": 1124.85
+          },
+          "expired": false,
+          "full_search_settle_ms": 18.176,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_after": {
+        "idle": {
+          "elapsed_ms": 1004.83,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 90,
+            "p95_ms": 30.756,
+            "max_ms": 355.42,
+            "median_ms": 5.363
+          },
+          "navigation_callback_plus_render": {
+            "samples": 12,
+            "p95_ms": 33.149,
+            "max_ms": 350.569,
+            "median_ms": 18.642
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2226.991,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 248,
+            "p95_ms": 30.413,
+            "max_ms": 339.064,
+            "median_ms": 5.52
+          },
+          "navigation_callback_plus_render": {
+            "samples": 32,
+            "p95_ms": 32.933,
+            "max_ms": 335.267,
+            "median_ms": 23.654
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 248.331,
+            "max_ms": 348.731,
+            "median_ms": 11.849
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 393.216,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 9,
+            "p95_ms": 8.333,
+            "max_ms": 339.925,
+            "median_ms": 6.219
+          },
+          "navigation_callback_plus_render": {
+            "samples": 2,
+            "p95_ms": 6.867,
+            "max_ms": 335.692,
+            "median_ms": 171.28
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 29.357,
+            "max_ms": 29.523,
+            "median_ms": 15.999
+          },
+          "expired": false,
+          "full_search_settle_ms": 178.126,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "targets": {
+        "warmed_loaded_navigation_p95_under100ms": true,
+        "warmed_log_burst_heartbeat_under250ms": true,
+        "idle_navigation_p95_under50ms": true,
+        "retained_log_limit_and_omission_count": true
+      }
+    },
+    "1400x900": {
+      "before": {
+        "idle": {
+          "elapsed_ms": 1004.374,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 110,
+            "p95_ms": 41.757,
+            "max_ms": 79.234,
+            "median_ms": 5.723
+          },
+          "navigation_callback_plus_render": {
+            "samples": 14,
+            "p95_ms": 53.287,
+            "max_ms": 78.808,
+            "median_ms": 29.482
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2275.134,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 202,
+            "p95_ms": 42.676,
+            "max_ms": 66.906,
+            "median_ms": 5.718
+          },
+          "navigation_callback_plus_render": {
+            "samples": 33,
+            "p95_ms": 43.448,
+            "max_ms": 66.212,
+            "median_ms": 22.564
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 106.725,
+            "max_ms": 119.982,
+            "median_ms": 57.116
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 2203.09,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 36,
+            "p95_ms": 42.833,
+            "max_ms": 1861.061,
+            "median_ms": 5.734
+          },
+          "navigation_callback_plus_render": {
+            "samples": 6,
+            "p95_ms": 50.402,
+            "max_ms": 1841.733,
+            "median_ms": 41.642
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 1835.619,
+            "max_ms": 1928.866,
+            "median_ms": 1013.764
+          },
+          "expired": false,
+          "full_search_settle_ms": 16.731,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "after": {
+        "idle": {
+          "elapsed_ms": 1008.436,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 106,
+            "p95_ms": 47.065,
+            "max_ms": 66.794,
+            "median_ms": 5.676
+          },
+          "navigation_callback_plus_render": {
+            "samples": 14,
+            "p95_ms": 61.265,
+            "max_ms": 65.721,
+            "median_ms": 34.473
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2211.791,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 227,
+            "p95_ms": 47.383,
+            "max_ms": 61.598,
+            "median_ms": 5.713
+          },
+          "navigation_callback_plus_render": {
+            "samples": 31,
+            "p95_ms": 51.611,
+            "max_ms": 65.055,
+            "median_ms": 25.633
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 48.255,
+            "max_ms": 68.173,
+            "median_ms": 12.258
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 283.794,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 24,
+            "p95_ms": 25.025,
+            "max_ms": 64.639,
+            "median_ms": 5.708
+          },
+          "navigation_callback_plus_render": {
+            "samples": 4,
+            "p95_ms": 55.513,
+            "max_ms": 60.464,
+            "median_ms": 39.733
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 40.192,
+            "max_ms": 40.362,
+            "median_ms": 22.759
+          },
+          "expired": false,
+          "full_search_settle_ms": 179.535,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_before": {
+        "idle": {
+          "elapsed_ms": 1005.64,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 74,
+            "p95_ms": 43.55,
+            "max_ms": 400.306,
+            "median_ms": 5.712
+          },
+          "navigation_callback_plus_render": {
+            "samples": 10,
+            "p95_ms": 44.914,
+            "max_ms": 398.984,
+            "median_ms": 28.705
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2211.953,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 149,
+            "p95_ms": 46.712,
+            "max_ms": 407.947,
+            "median_ms": 5.683
+          },
+          "navigation_callback_plus_render": {
+            "samples": 25,
+            "p95_ms": 48.809,
+            "max_ms": 408.056,
+            "median_ms": 44.06
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 378.751,
+            "max_ms": 462.949,
+            "median_ms": 74.087
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 2547.649,
+          "delivered_lines": 10000,
+          "retained_lines": 10000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 36,
+            "p95_ms": 48.47,
+            "max_ms": 1848.26,
+            "median_ms": 5.712
+          },
+          "navigation_callback_plus_render": {
+            "samples": 6,
+            "p95_ms": 399.247,
+            "max_ms": 1826.992,
+            "median_ms": 45.482
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 2173.376,
+            "max_ms": 2263.667,
+            "median_ms": 1354.51
+          },
+          "expired": false,
+          "full_search_settle_ms": 17.456,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "10001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "cold_after": {
+        "idle": {
+          "elapsed_ms": 1003.569,
+          "delivered_lines": 0,
+          "retained_lines": 0,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 83,
+            "p95_ms": 17.174,
+            "max_ms": 317.568,
+            "median_ms": 5.628
+          },
+          "navigation_callback_plus_render": {
+            "samples": 11,
+            "p95_ms": 49.519,
+            "max_ms": 317.465,
+            "median_ms": 16.058
+          },
+          "worker_publication_latency": {
+            "samples": 0,
+            "p95_ms": null,
+            "max_ms": null
+          },
+          "expired": false,
+          "payload": "idle",
+          "rendered_line_index": "1.0",
+          "tk": "9.1.0"
+        },
+        "sustained": {
+          "elapsed_ms": 2245.136,
+          "delivered_lines": 2000,
+          "retained_lines": 2000,
+          "omitted_lines": 0,
+          "heartbeat_gap": {
+            "samples": 212,
+            "p95_ms": 45.802,
+            "max_ms": 332.98,
+            "median_ms": 5.685
+          },
+          "navigation_callback_plus_render": {
+            "samples": 28,
+            "p95_ms": 49.22,
+            "max_ms": 328.096,
+            "median_ms": 31.095
+          },
+          "worker_publication_latency": {
+            "samples": 200,
+            "p95_ms": 230.553,
+            "max_ms": 330.632,
+            "median_ms": 13.703
+          },
+          "expired": false,
+          "payload": "2000lines/2s,10lines every10ms",
+          "rendered_line_index": "2001.0",
+          "tk": "9.1.0"
+        },
+        "burst": {
+          "elapsed_ms": 378.089,
+          "delivered_lines": 10000,
+          "retained_lines": 5000,
+          "omitted_lines": 5000,
+          "heartbeat_gap": {
+            "samples": 8,
+            "p95_ms": 10.991,
+            "max_ms": 323.538,
+            "median_ms": 7.908
+          },
+          "navigation_callback_plus_render": {
+            "samples": 2,
+            "p95_ms": 7.303,
+            "max_ms": 320.078,
+            "median_ms": 163.691
+          },
+          "worker_publication_latency": {
+            "samples": 100,
+            "p95_ms": 31.382,
+            "max_ms": 31.531,
+            "median_ms": 16.913
+          },
+          "expired": false,
+          "full_search_settle_ms": 180.581,
+          "payload": "10000lines in100 queued100linechunks",
+          "rendered_line_index": "5001.0",
+          "tk": "9.1.0"
+        }
+      },
+      "targets": {
+        "warmed_loaded_navigation_p95_under100ms": true,
+        "warmed_log_burst_heartbeat_under250ms": true,
+        "idle_navigation_p95_under50ms": false,
+        "retained_log_limit_and_omission_count": true
+      }
+    }
+  },
+  "limitations": [
+    "10,000-line burst comparison includes the approved change from unlimited history to5,000retained lines with5,000omitted notice.",
+    "Controlled scheduled navigation/queue timings are not physical mouse latency or universalFPS/hardware guarantees.",
+    "First Store mapping after non-default geometry still measured~317-355ms in this final cold run; warmed numbers do not hide it.",
+    "Largest-window warmed idle navigationp95 was61.265ms, above proposed50ms; loadnavigation remainedbelow100ms.",
+    "Full searchsettle measured~173-180ms, including150msdebounce; immediatehandler and settledresultlatencies differ.",
+    "Exceptionallylarge singlelines remain subjecttonativeTk layoutcost; nohiddenline/byte truncation."
+  ]
+}

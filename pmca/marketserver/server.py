@@ -1,3 +1,4 @@
+import errno
 import sys
 import contextlib
 from http.server import BaseHTTPRequestHandler
@@ -58,7 +59,12 @@ class LocalMarketServer(TCPServer):
  allow_reuse_address = True
 
  def __init__(self, certFile, host='127.0.0.1', port=4443):
-  super(LocalMarketServer, self).__init__((host, port), HttpHandler)
+  try:
+   super(LocalMarketServer, self).__init__((host, port), HttpHandler)
+  except OSError as e:
+   if e.errno != errno.EADDRINUSE or port == 0:
+    raise
+   super(LocalMarketServer, self).__init__((host, 0), HttpHandler)
   self.url = 'https://' + host + '/'
   self.apk = None
   self.result = None

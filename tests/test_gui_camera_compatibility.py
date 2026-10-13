@@ -253,7 +253,7 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
   self.assertEqual(str(root.installerFrame.installButton['state']), 'disabled')
   root.close()
 
- def test_legacy_status_missing_support_flag_preserves_backward_compatibility(self):
+ def test_legacy_status_missing_support_flag_fails_closed(self):
   info = {
    'connected': True,
    'physicalDetected': True,
@@ -265,17 +265,17 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
    'vendor': 'Sony (0x054c)',
    'serial': '12345678',
   }
-  root = self.gui['MainUi']('Test Legacy Status', installerOnly=True)
+  root = self.gui['MainUi']('Test Missing Support Flag Fails Closed', installerOnly=True)
   root.withdraw()
   root.onCameraStatusUpdate(info)
   root.update()
 
   self.assertTrue(root.cameraConnected)
-  self.assertTrue(root.cameraInstallEnabled)
+  self.assertFalse(root.cameraInstallEnabled)
 
   root.installerFrame.setApkFile(str(self.apk_path))
   root.update()
-  self.assertEqual(str(root.installerFrame.installButton['state']), 'normal')
+  self.assertEqual(str(root.installerFrame.installButton['state']), 'disabled')
   root.close()
 
  def test_transition_a7_to_7rm2_to_7m3_with_same_root(self):
@@ -578,28 +578,33 @@ class GuiCameraCompatibilityTest(unittest.TestCase):
 
   root.close()
 
- def test_gui_header_and_footer_display_v1_1_0(self):
-  root = self.gui['MainUi']('Test Version Presentation', installerOnly=True)
-  root.withdraw()
-  root.update()
+ def test_gui_header_and_footer_display_current_and_fixture_versions(self):
+  from pmca import __version__ as public_version
+  for expected_ver, patch_ctx in [
+   (public_version, contextlib.nullcontext()),
+   ('1.2.0', patch.dict(self.gui, {'version': '1.2.0'})),
+  ]:
+   with self.subTest(version=expected_ver), patch_ctx:
+    root = self.gui['MainUi']('Test Version Presentation', installerOnly=True)
+    root.withdraw()
+    root.update()
 
-  labels = []
-  def collect_labels(widget):
-   for child in widget.winfo_children():
-    if child.winfo_class() == 'TLabel':
-     try:
-      txt = child.cget('text')
-      if txt:
-       labels.append(txt)
-     except Exception:
-      pass
-    collect_labels(child)
-  collect_labels(root)
+    labels = []
+    def collect_labels(widget):
+     for child in widget.winfo_children():
+      if child.winfo_class() == 'TLabel':
+       try:
+        txt = child.cget('text')
+        if txt:
+         labels.append(txt)
+       except Exception:
+        pass
+      collect_labels(child)
+    collect_labels(root)
 
-  self.assertTrue(any(lbl == 'v1.1.0' for lbl in labels), f"Header version label must show exactly 'v1.1.0', found: {labels}")
-  self.assertTrue(any(lbl == 'Version 1.1.0' for lbl in labels), f"Footer version label must show exactly 'Version 1.1.0', found: {labels}")
-
-  root.close()
+    self.assertTrue(any(lbl == f'v{expected_ver}' for lbl in labels), f"Header version label must show 'v{expected_ver}', found: {labels}")
+    self.assertTrue(any(lbl == f'Version {expected_ver}' for lbl in labels), f"Footer version label must show 'Version {expected_ver}', found: {labels}")
+    root.close()
 
  def test_close_and_destroy_cancels_pending_queue_timer_and_aborts_workers(self):
   root = self.gui['MainUi']('Test Timer Cancellation', installerOnly=True)

@@ -1,6 +1,6 @@
 # Camera support and verification
 
-Sony Open PMCA distinguishes reference eligibility, runtime protocol capability, application prerequisites and physical verification. Version 1.1.0 does not guarantee that every feature or APK works on every PMCA body.
+Sony Open PMCA distinguishes reference eligibility, runtime protocol capability, application prerequisites and physical verification. Version 1.2.0 does not guarantee that every feature or APK works on every PMCA body.
 
 ## Evidence and runtime gates
 
@@ -15,6 +15,12 @@ Sony Open PMCA distinguishes reference eligibility, runtime protocol capability,
 Known app-ineligible bodies cannot be switched into the installer simply because they respond to USB. Read-only information remains available when communication succeeds. The GUI explains when installation is blocked or the model is unconfirmed. Cached vendor serial, firmware and photo-counter data are reused only for a matched camera identity.
 
 The shared model reference contains the complete pinned upstream dataset, including camcorder/action-camera records. The README table focuses on its 25 still-camera model codes. HX60V/HX90V/HX400V use their normalized upstream HX family profiles in `camera_support.model` for app eligibility. The top-level status `model` retains the device-reported GPS variant code; a shared eligibility profile does not prove GPS application compatibility.
+
+## USB mode is not full-access permission
+
+Mass Storage normally exposes the storage volume. Accessible compatible legacy MSC drivers additionally carry Sony vendor SCSI `0x7a` commands for model/diagnostic information and a deliberate installer transition; ordinary drive access is not camera OS root access. App transfer itself uses the MTP installer proxy, not copying an APK to the card.
+
+The macOS desktop keeps the MTP-only context and never captures/unmounts mounted MSC storage automatically. Passive registry results explain the selected-driver/mode mismatch. Generic SCSI Inquiry products (`DSC`/`Camcorder`) do not establish body identity or PMCA eligibility. Windows/Linux legacy MSC routes remain driver/model-dependent and require their own physical verification; fixtures prove the corrected driver contract, not universal hardware access.
 
 ## Image-counter routing
 

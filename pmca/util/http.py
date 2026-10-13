@@ -4,6 +4,10 @@ from collections import namedtuple
 from urllib.parse import *
 from urllib.request import *
 
+class DownloadCancelledError(Exception):
+ """Raised when an in-flight download operation is cancelled."""
+ pass
+
 HttpResponse = namedtuple('HttpResponse', 'url, data, raw_data, headers')
 
 DEFAULT_TIMEOUT = 15

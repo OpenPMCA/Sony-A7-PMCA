@@ -5,6 +5,7 @@ import binascii
 from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
 from io import BytesIO
+import time
 
 try:
  from Cryptodome.Hash import SHA256
@@ -85,21 +86,33 @@ class _BaseSonyMscExtCmdDevice(MscDevice):
  MSC_OC_ExtCmd = 0x7a
 
  MSC_SENSE_DeviceBusy = (0x9, 0x81, 0x81)
+ BUSY_TIMEOUT = 30.0
+ BUSY_RETRY_DELAY = 0.02
 
  def sendSonyExtCommand(self, cmd, data, bufferSize):
   command = dump8(self.MSC_OC_ExtCmd) + dump32le(cmd) + 7*b'\0'
 
-  response = self.MSC_SENSE_DeviceBusy
-  while response == self.MSC_SENSE_DeviceBusy:
-   response = self.driver.sendWriteCommand(command, data)
+  response = self.driver.sendWriteCommand(command, data)
+  if response == self.MSC_SENSE_DeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.MSC_SENSE_DeviceBusy:
+    if time.monotonic() >= deadline:
+     raise UnknownMscException('Camera remained busy after %.1fs' % self.BUSY_TIMEOUT)
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response = self.driver.sendWriteCommand(command, data)
   self._checkResponse(response)
 
   if bufferSize == 0:
    return b''
 
-  response = self.MSC_SENSE_DeviceBusy
-  while response == self.MSC_SENSE_DeviceBusy:
-   response, data = self.driver.sendReadCommand(command, bufferSize)
+  response, data = self.driver.sendReadCommand(command, bufferSize)
+  if response == self.MSC_SENSE_DeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.MSC_SENSE_DeviceBusy:
+    if time.monotonic() >= deadline:
+     raise UnknownMscException('Camera remained busy after %.1fs' % self.BUSY_TIMEOUT)
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response, data = self.driver.sendReadCommand(command, bufferSize)
   self._checkResponse(response)
   return data
 
@@ -122,19 +135,31 @@ class SonyMtpExtCmdDevice(MtpDevice, SonyExtCmdDevice):
  PTP_OC_SonyGetBurstshotGroupNum = 0x9283
  PTP_OC_SonyGetBurstshotObjectHandles = 0x9284
  PTP_OC_SonyGetAVIndexID = 0x9285
+ BUSY_TIMEOUT = 30.0
+ BUSY_RETRY_DELAY = 0.02
 
  def sendSonyExtCommand(self, cmd, data, bufferSize):
-  response = self.PTP_RC_DeviceBusy
-  while response == self.PTP_RC_DeviceBusy:
-   response = self.driver.sendWriteCommand(self.PTP_OC_SonyDiExtCmd_write, [cmd], data)
+  response = self.driver.sendWriteCommand(self.PTP_OC_SonyDiExtCmd_write, [cmd], data)
+  if response == self.PTP_RC_DeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.PTP_RC_DeviceBusy:
+    if time.monotonic() >= deadline:
+     raise MtpException('Camera remained busy (0x%x) after %.1fs' % (self.PTP_RC_DeviceBusy, self.BUSY_TIMEOUT))
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response = self.driver.sendWriteCommand(self.PTP_OC_SonyDiExtCmd_write, [cmd], data)
   self._checkResponse(response)
 
   if bufferSize == 0:
    return b''
 
-  response = self.PTP_RC_DeviceBusy
-  while response == self.PTP_RC_DeviceBusy:
-   response, data = self.driver.sendReadCommand(self.PTP_OC_SonyDiExtCmd_read, [cmd])
+  response, data = self.driver.sendReadCommand(self.PTP_OC_SonyDiExtCmd_read, [cmd])
+  if response == self.PTP_RC_DeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.PTP_RC_DeviceBusy:
+    if time.monotonic() >= deadline:
+     raise MtpException('Camera remained busy (0x%x) after %.1fs' % (self.PTP_RC_DeviceBusy, self.BUSY_TIMEOUT))
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response, data = self.driver.sendReadCommand(self.PTP_OC_SonyDiExtCmd_read, [cmd])
   self._checkResponse(response)
   return data
 
@@ -618,17 +643,30 @@ class SonyMtpAppInstallDevice(MtpDevice, SonyAppInstallDevice):
   ('type', Struct.INT16),
  ], Struct.BIG_ENDIAN)
 
+ BUSY_TIMEOUT = 30.0
+ BUSY_RETRY_DELAY = 0.02
+
  def _write(self, data):
   info = self.InfoMsgHeader.pack(magic=self.InfoMsgHeaderMagic, dataSize=len(data))
 
-  response = self.PTP_RC_SonyDeviceBusy
-  while response == self.PTP_RC_SonyDeviceBusy:
-   response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessageInfo, [], info)
+  response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessageInfo, [], info)
+  if response == self.PTP_RC_SonyDeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.PTP_RC_SonyDeviceBusy:
+    if time.monotonic() >= deadline:
+     raise MtpException('Camera installer busy (0x%x) after %.1fs' % (self.PTP_RC_SonyDeviceBusy, self.BUSY_TIMEOUT))
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessageInfo, [], info)
   self._checkResponse(response)
 
-  response = self.PTP_RC_SonyDeviceBusy
-  while response == self.PTP_RC_SonyDeviceBusy:
-   response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessage, [], data)
+  response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessage, [], data)
+  if response == self.PTP_RC_SonyDeviceBusy:
+   deadline = time.monotonic() + self.BUSY_TIMEOUT
+   while response == self.PTP_RC_SonyDeviceBusy:
+    if time.monotonic() >= deadline:
+     raise MtpException('Camera installer busy (0x%x) after %.1fs' % (self.PTP_RC_SonyDeviceBusy, self.BUSY_TIMEOUT))
+    time.sleep(self.BUSY_RETRY_DELAY)
+    response = self.driver.sendWriteCommand(self.PTP_OC_SendProxyMessage, [], data)
   self._checkResponse(response)
 
  def _read(self):
@@ -766,10 +804,21 @@ class SonyAppInstallCamera(object):
   else:
    raise Exception('Unknown message type: 0x%x' % type)
 
- def _receiveResponse(self, type):
+ RESPONSE_TIMEOUT = 30.0
+ POLL_INTERVAL = 0.02
+
+ def _receiveResponse(self, type, timeout=None):
+  timeout = self.RESPONSE_TIMEOUT if timeout is None else timeout
+  deadline = time.monotonic() + timeout
   msg = None
+  attempts = 0
   while msg is None:
+   if attempts > 0:
+    if time.monotonic() >= deadline:
+     raise TimeoutError('Timed out waiting for camera installer response (%s)' % getattr(type, '__name__', str(type)))
+    time.sleep(self.POLL_INTERVAL)
    msg = self.receive()
+   attempts += 1
   if not isinstance(msg, type):
    raise Exception('Wrong response: %s' % str(msg))
   return msg
@@ -787,11 +836,14 @@ class SonyAppInstallCamera(object):
  def _sendRestMessage(self, subType, data):
   self.dev.sendMessage(self.SONY_MSG_Rest, self.RestMsgHeader.pack(type=subType, size=len(data)) + data)
 
- def emptyBuffer(self):
+ def emptyBuffer(self, max_messages=64):
   """Receives and discards all pending messages from the camera"""
-  msg = True
-  while msg:
+  count = 0
+  while count < max_messages:
    msg = self.receive()
+   if not msg:
+    break
+   count += 1
 
  def sendInit(self, protocols=ProtocolMsgProtos):
   """Send an initialization message to the camera"""

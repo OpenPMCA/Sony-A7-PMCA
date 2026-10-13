@@ -152,7 +152,9 @@ class CameraStatusCompatibilityTest(unittest.TestCase):
        patch.object(usb, 'listDevices', return_value=iter([app_device])), \
        patch.object(usb, 'installApp', return_value=None), \
        patch.object(usb.time, 'sleep'), contextlib.redirect_stdout(output):
-   usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
+   with self.assertRaises(usb.CameraOperationError) as ctx:
+    usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
+  self.assertFalse(ctx.exception.outcome_unknown)
   camera.switchToAppInstaller.assert_not_called()
   self.assertIn('PMCA', output.getvalue())
 
@@ -269,7 +271,9 @@ class CameraStatusCompatibilityTest(unittest.TestCase):
        patch.object(usb, 'getDevice', return_value=device), \
        patch.object(usb, 'installApp', return_value={}) as install, \
        contextlib.redirect_stdout(io.StringIO()) as output:
-   usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
+   with self.assertRaises(usb.CameraOperationError) as ctx:
+    usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
+  self.assertFalse(ctx.exception.outcome_unknown)
   install.assert_not_called()
   self.assertIn('PMCA', output.getvalue())
 
@@ -516,8 +520,9 @@ class CameraStatusCompatibilityTest(unittest.TestCase):
        patch.object(usb, 'listDevices', return_value=[app_device]), \
        patch.object(usb, 'installApp', return_value={}) as install, \
        patch.object(usb.time, 'sleep'), contextlib.redirect_stdout(io.StringIO()):
-   result = usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
-  self.assertIsNone(result)
+   with self.assertRaises(usb.CameraOperationError) as ctx:
+    usb.installCommand('libusb-mtp', apkFile=io.BytesIO(apkFixture()))
+  self.assertFalse(ctx.exception.outcome_unknown)
   install.assert_not_called()
 
 

@@ -1,4 +1,4 @@
-# Sony Open PMCA Backend API Contract (v1.1.0)
+# Sony Open PMCA Backend API Contract (v1.2.0)
 
 This document specifies the official backend API contract implemented across `pmca.commands.usb`, `pmca.marketserver`, and `pmca.appstore.catalog`.
 
@@ -12,7 +12,7 @@ Alias: `checkCameraConnection`
 Non-intrusive read-only query of hardware USB connection, MTP communication, and extended camera capabilities.
 
 #### Concurrency
-- Uses a reentrant lock `camera_operation` (`threading.RLock()`) shared across `installApp`, `installCommand`, and `infoCommand`.
+- Uses a reentrant lock `camera_operation` (`threading.RLock()`) shared across `installApp`, `installCommand`, and `infoCommand`. This is in-process serialization, not exclusive ownership across other applications or Claude sessions; live checks need external coordination.
 - Non-blocking: If an active installation or transfer is in progress (`is_camera_busy() == True`), `getCameraStatus` immediately returns `status='busy'` without touching USB endpoints or interrupting the transfer.
 - Provenance tracking: If a camera was previously verified, `status='busy'` preserves the verified model and mode. It does **not** assert new physical or app connectivity when busy is triggered without a verified camera.
 
@@ -45,8 +45,8 @@ Non-intrusive read-only query of hardware USB connection, MTP communication, and
     
     # Installation eligibility (populated for verified MTP/installer sessions)
     'camera_support': dict,   # Optional pinned reference profile; pmca_apps is True, False or None
-    'app_installation_supported': bool, # Model plus actual transport/proxy gate; missing means unconfirmed
-    'app_installation_reason': str,     # Optional explanation; not a guarantee that a particular APK runs
+    'app_installation_supported': bool, # Explicit on every branch; unverified/missing identity cannot enable install
+    'app_installation_reason': str,     # Explicit factual explanation; not a guarantee that a particular APK runs
 
     # Capabilities (from standard PTP GetDeviceInfo)
     'capabilities': list[int], # Supported PTP operation codes (e.g. [0x1001, 0x9280, ...])
@@ -62,6 +62,10 @@ Non-intrusive read-only query of hardware USB connection, MTP communication, and
     }
 }
 ```
+
+Automatic status checks do not reset generic MSC interfaces held by the kernel storage driver or whose ownership cannot be verified; they return actionable mode guidance instead. Explicit legacy CLI operations and native SCSI pass-through drivers remain separate, and offline fixtures are not proof that a mounted volume is safe to capture.
+
+Normal MTP status probes run before optional passive registry diagnostics. On macOS a Mass Storage volume excluded by the MTP-only context is reported with camera-menu MTP guidance, not automatically blamed on `ptpcamerad` or permissions. Passive detection does not claim the storage interface or change camera mode.
 
 #### Status States
 1. **`ready`**: Physical device detected AND live MTP/MSC session verified. `connected=True`, `appConnected=True`, `physicalDetected=True`.
@@ -122,7 +126,7 @@ Refreshes application release metadata with hourly caching and rate-limit backof
     - `res.last_success`: ISO timestamp of latest successful refresh
     - `res.updated_count`: number of updated apps
 
-### `downloadCatalogApp(app, filename, progress=None, timeout=30)`
+### `downloadCatalogApp(app, filename, progress=None, timeout=30, abort_event=None)`
 Downloads, parses, and validates an APK archive against the declared package/API baseline and certificate-presence checks.
 - Enforces HTTPS URL scheme.
 - Downloads chunked stream to `.pmca-app-*.apk` temporary file with `progress(downloaded_bytes, total_bytes)` reporting.
@@ -130,7 +134,11 @@ Downloads, parses, and validates an APK archive against the declared package/API
   - Matches `getPackageName()` against expected app package.
   - Asserts `minSdkVersion` is between 1 and 10.
   - Verifies presence of APK signature certificate (`getCert()`).
-- Atomically replaces `filename` via `os.replace`. Destination is untouched if download or validation fails.
+- Atomically replaces `filename` via `os.replace`. Destination is untouched if download or validation fails. Cooperative `abort_event` checks raise `pmca.util.http.DownloadCancelledError` at safe local request/chunk/validation/pre-commit boundaries, close streams and remove only the owned partial file. The existing `timeout` remains the fourth positional argument. Cancellation is not immediate during blocked I/O and does not roll back an already committed replacement.
+
+### `downloadRecipeLab(filename, progress=None, abort_event=None)`
+Uses the same local cancellation exception and atomic destination-preservation contract. Downloading either APK never starts camera installation.
+
 
 ---
 
@@ -149,11 +157,18 @@ Parses and validates an APK package before transfer:
 
 ### `installCommand(driverName=None, apkFile=None, appPackage=None, outFile=None, statusFunc=None)`
 - **Immutable Preflight**: Resolves and validates `apkData` with `checkApk(io.BytesIO(apkData))` **BEFORE** calling `SonyExtCmdCamera.switchToAppInstaller()` or touching USB drivers.
-- Guarantees camera mode remains unchanged if the selected APK is invalid or corrupt.
+- Guarantees camera mode remains unchanged if the selected APK is invalid or corrupt. Direct `installApp` callers also validate before relay-server startup; an internal immutable prevalidated handoff avoids analyzing the same bytes twice without exposing a CLI validation bypass.
 - **Camera eligibility gate**: Before a mode switch, checks the pinned model profile plus the actual Sony transport. Known app-ineligible or unconfirmed models are not switched into the installer. An already-active genuine Sony installer proxy can confirm an otherwise unlisted model; MTP installer proxy operations are rechecked before `installApp`, and a different reported model after the mode transition cancels transfer rather than selecting that camera.
 - Once preflight passes and camera is in App Installation mode, passes `io.BytesIO(apkData)` directly to `installApp`.
 - Dispatches transfer progress to `statusFunc(status)` with percent and message (`Uploading`, `Downloading`, `Installing`).
 - Server ACK and install completion: Waits for camera to post completion notification, asserting `Result(code=0, message='Successfully completed')`.
+
+### Expected operation failures
+`CameraOperationError(message, phase='unknown', outcome_unknown=False)` exposes the failing phase and whether the camera may already have accepted installation. Preflight/discovery/mode errors are not successful installs. A transfer/completion failure can leave the result unknown: inspect the camera's applications before retrying, keep power/USB connected, and never claim automatic rollback.
+
+Vendor Busy and initial response waits use conservative monotonic phase deadlines with pacing; install relay inactivity resets on camera/socket activity rather than imposing a short overall installation limit. Native driver calls already blocked cannot be interrupted by a Python deadline. These bounds are software-tested, not a measured guarantee for every camera.
+
+Relay sockets use complete writes, explicit EOF handling and finally-owned cleanup. Installation requests an ephemeral loopback port and uses the actual `server_address`; the legacy `LocalMarketServer` constructor still defaults to 4443 and only address-in-use fallback selects a free port. No Cancel/rollback API is exposed for camera writes.
 
 ### `getReadOnlyCameraInfo(driverName=None)`
 Non-intrusive query function reading full hardware metadata:

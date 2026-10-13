@@ -7,6 +7,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 import urllib.parse
 from urllib import request
@@ -19,6 +20,7 @@ from tkinter.messagebox import askyesno, showerror
 import certifi
 from pmca.appstore.recipelab import downloadRecipeLab, HttpsRedirectHandler
 from pmca.appstore.catalog import loadCatalog, saveCatalog, syncCatalogMetadata, downloadCatalogApp, SEED_APPS
+from pmca.util.http import DownloadCancelledError
 
 import config
 from pmca.commands.usb import *
@@ -187,6 +189,16 @@ class InfoTask(BackgroundTask):
    self.ui.master.setCameraBusy(False)
 
 
+def _setTaskDownloadBusy(ui, busy):
+ master = getattr(ui, "master", None)
+ if master is None:
+  return
+ if hasattr(master, "setDownloadBusy"):
+  master.setDownloadBusy(busy)
+ elif hasattr(master, "setCameraBusy"):
+  master.setCameraBusy(busy)
+
+
 class InstallTask(BackgroundTask):
  """Task to run installCommand()"""
  def doBefore(self):
@@ -197,7 +209,7 @@ class InstallTask(BackgroundTask):
    reason = getattr(self.ui.master, "supportReason", "") or "PMCA app installation is not supported on this camera model."
    showerror('Cannot install APK', 'Cannot install app on this camera:\n\n%s' % reason)
    return
-  if getattr(self.ui.master, "cameraBusy", False) or getattr(self.ui.master, "lastReportedBackendBusy", False):
+  if getattr(self.ui.master, "cameraBusy", False) or getattr(self.ui.master, "lastReportedBackendBusy", False) or getattr(self.ui.master, "downloadBusy", False):
    showerror('Cannot install APK', 'Camera is currently busy with another operation. Wait for the current operation to finish.')
    return
   mode, apkFilename, app = self.ui.getMode(), self.ui.getSelectedApk(), self.ui.getSelectedApp()
@@ -234,6 +246,8 @@ class InstallTask(BackgroundTask):
 
   if not askyesno('Install app on camera', 'Install %s on the connected camera?\n\nConfirm that this app supports your model and firmware. Keep the camera powered and connected until the task completes.' % name):
    return
+  if hasattr(self.ui, "_nextTaskGeneration"):
+   self.taskGen = self.ui._nextTaskGeneration()
   self.ui.master.setCameraBusy(True)
   return mode, apkData, app, self.ui.master.driverName
 
@@ -244,18 +258,27 @@ class InstallTask(BackgroundTask):
   response = None
   try:
    print('')
-   self.ui.run(lambda: self.ui.updateProgress(0, 'Starting installation'))
+   self.ui.run(lambda: self._emitProgress(0, 'Starting installation'))
    if mode == self.ui.MODE_APP and app:
     response = installCommand(driverName=driverName, appPackage=app.package, statusFunc=self.onStatus)
    elif mode == self.ui.MODE_APK and apkData:
     response = installCommand(driverName=driverName, apkFile=io.BytesIO(apkData), statusFunc=self.onStatus)
-  except Exception:
+  except Exception as e:
    traceback.print_exc()
+   if getattr(e, "outcome_unknown", False) or hasattr(e, "phase"):
+    return True, e
   return True, (response if response else False)
+
+ def _emitProgress(self, percent, message):
+  tgen = getattr(self, "taskGen", None)
+  active = getattr(self.ui, "_activeTaskGen", tgen)
+  if tgen is not None and active is not None and tgen != active:
+   return
+  self.ui.updateProgress(percent, message)
 
  def onStatus(self, status):
   printStatus(status)
-  self.ui.run(lambda: self.ui.updateProgress(status.percent, status.message))
+  self.ui.run(lambda: self._emitProgress(status.percent, status.message))
 
  def doAfter(self, result):
   if result:
@@ -269,7 +292,11 @@ class RecipeDownloadTask(BackgroundTask):
   filename = asksaveasfilename(parent=self.ui.master, title='Save RecipeLab APK', initialdir=os.path.expanduser('~/Downloads'), initialfile='RecipeLab.apk', defaultextension='.apk', filetypes=[('Android apps', '*.apk')])
   if not filename:
    return
-  self.ui.master.setCameraBusy(True)
+  if hasattr(self.ui, "_nextTaskGeneration"):
+   self.taskGen = self.ui._nextTaskGeneration()
+  self.abortEvent = threading.Event()
+  self.ui.downloadAbortEvent = self.abortEvent
+  _setTaskDownloadBusy(self.ui, True)
   self.ui.updateProgress(None, 'Checking the latest RecipeLab release')
   return filename
 
@@ -279,8 +306,12 @@ class RecipeDownloadTask(BackgroundTask):
   result = None
   try:
    print('Downloading RecipeLab from voxivoid/recipe-lab-sony-pmca')
-   result = downloadRecipeLab(filename, self.onProgress)
+   abort_ev = getattr(self, "abortEvent", None)
+   result = downloadRecipeLab(filename, self.onProgress, abort_event=abort_ev)
    print('RecipeLab %s downloaded and validated (%d bytes). No camera app was installed.' % (result['version'], result['bytes']))
+  except DownloadCancelledError:
+   print('RecipeLab download cancelled.')
+   return True, 'CANCELLED'
   except Exception:
    traceback.print_exc()
   return True, result
@@ -288,16 +319,32 @@ class RecipeDownloadTask(BackgroundTask):
  def onProgress(self, downloaded, total):
   percent = 100 * downloaded / total if total else None
   message = 'Downloading RecipeLab (%d KB)' % (downloaded // 1024)
-  self.ui.run(lambda: self.ui.updateProgress(percent, message))
+  def _upd(p=percent, m=message):
+   tgen = getattr(self, "taskGen", None)
+   active = getattr(self.ui, "_activeTaskGen", tgen)
+   if tgen is not None and active is not None and tgen != active:
+    return
+   self.ui.updateProgress(p, m)
+  self.ui.run(_upd)
 
  def doAfter(self, result):
   if result:
-   if result[1]:
+   if getattr(self.ui, "downloadAbortEvent", None) is getattr(self, "abortEvent", None):
+    self.ui.downloadAbortEvent = None
+   tgen = getattr(self, "taskGen", None)
+   active = getattr(self.ui, "_activeTaskGen", tgen)
+   is_current = (tgen is None or active is None or tgen == active)
+   if result[1] == 'CANCELLED':
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(0, 'Download cancelled')
+   elif result[1]:
     self.ui.setApkFile(result[1]['path'])
-    self.ui.updateProgress(100, 'Download validated; not installed')
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(100, 'Download validated; not installed')
    else:
-    self.ui.updateProgress(0, 'Download failed; use a local APK or check Activity')
-   self.ui.master.setCameraBusy(False)
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(0, 'Download failed; use a local APK or check Activity')
+   _setTaskDownloadBusy(self.ui, False)
 
 
 
@@ -319,7 +366,12 @@ class CatalogAppDownloadTask(BackgroundTask):
   )
   if not filename:
    return
-  self.ui.master.setCameraBusy(True)
+  if hasattr(self.ui, "_nextTaskGeneration"):
+   self.taskGen = self.ui._nextTaskGeneration()
+  self.abortEvent = threading.Event()
+  self.ui.downloadAbortEvent = self.abortEvent
+  self.appName = app.name or 'app'
+  _setTaskDownloadBusy(self.ui, True)
   self.ui.updateProgress(None, 'Checking %s release information…' % (app.name or 'app'))
   return app, filename
 
@@ -330,9 +382,13 @@ class CatalogAppDownloadTask(BackgroundTask):
   result = None
   try:
    print('Downloading %s (%s)…' % (app.name, app.package))
-   result = downloadCatalogApp(app, filename, self.onProgress)
+   abort_ev = getattr(self, "abortEvent", None)
+   result = downloadCatalogApp(app, filename, self.onProgress, abort_event=abort_ev)
    print('%s %s downloaded and validated (%d bytes). No camera app was installed.' % (
     result['name'], result.get('version') or '', result['bytes']))
+  except DownloadCancelledError:
+   print('%s download cancelled.' % (app.name or 'App'))
+   return True, 'CANCELLED'
   except Exception:
    traceback.print_exc()
   return True, result
@@ -340,16 +396,32 @@ class CatalogAppDownloadTask(BackgroundTask):
  def onProgress(self, downloaded, total):
   percent = 100 * downloaded / total if total else None
   message = 'Downloading %s (%d KB)' % (getattr(self, 'appName', 'app'), downloaded // 1024)
-  self.ui.run(lambda: self.ui.updateProgress(percent, message))
+  def _upd(p=percent, m=message):
+   tgen = getattr(self, "taskGen", None)
+   active = getattr(self.ui, "_activeTaskGen", tgen)
+   if tgen is not None and active is not None and tgen != active:
+    return
+   self.ui.updateProgress(p, m)
+  self.ui.run(_upd)
 
  def doAfter(self, result):
   if result:
-   if result[1]:
+   if getattr(self.ui, "downloadAbortEvent", None) is getattr(self, "abortEvent", None):
+    self.ui.downloadAbortEvent = None
+   tgen = getattr(self, "taskGen", None)
+   active = getattr(self.ui, "_activeTaskGen", tgen)
+   is_current = (tgen is None or active is None or tgen == active)
+   if result[1] == 'CANCELLED':
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(0, 'Download cancelled')
+   elif result[1]:
     self.ui.setApkFile(result[1]['path'])
-    self.ui.updateProgress(100, '%s downloaded and validated; not installed' % result[1]['name'])
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(100, '%s downloaded and validated; not installed' % result[1]['name'])
    else:
-    self.ui.updateProgress(0, 'Download failed; check Activity log')
-   self.ui.master.setCameraBusy(False)
+    if is_current and not getattr(self.ui.master, "cameraBusy", False):
+     self.ui.updateProgress(0, 'Download failed; check Activity log')
+   _setTaskDownloadBusy(self.ui, False)
 
 class FirmwareUpdateTask(BackgroundTask):
  """Task to run firmwareUpdateCommand()"""
@@ -435,7 +507,29 @@ class TweakApplyTask(BackgroundTask):
 
 class MainUi(UiRoot):
  """Production desktop GUI: 1160x760 landscape, 3-item nav, real-time connection monitor, 2:8 vertical store."""
+ QUEUE_MAX_SLICE_ITEMS = 40
+ QUEUE_MAX_SLICE_SEC = 0.008
+ QUEUE_IDLE_DELAY_MS = 16
+ QUEUE_ACTIVE_DELAY_MS = 8
+ MAX_LOG_RETENTION = 5000
+ FILTER_DEBOUNCE_MS = 150
+ FILTER_CHUNK_SIZE = 1000
+
  def __init__(self, title, installerOnly=False):
+  self.maxLogEntries = self.MAX_LOG_RETENTION
+  self.rawLogEntries = []
+  self.omittedLogCount = 0
+  self._logGeneration = 0
+  self._filterGeneration = 0
+  self._logFilterAfterId = None
+  self._logFilterChunkAfterId = None
+  self._pendingFilterAppends = []
+  self._sliceLogBatch = []
+  self._sliceLogEvictedCount = 0
+  self._inQueueSlice = False
+  self.downloadBusy = False
+  self.fetchingInfo = False
+  self._cameraSessionId = 0
   UiRoot.__init__(self)
   self.installerOnly = installerOnly
   try:
@@ -543,13 +637,16 @@ class MainUi(UiRoot):
   logFilterBar.pack(fill=X, pady=(0, 6))
   Label(logFilterBar, text="Search logs:", style="Detail.TLabel").pack(side=LEFT, padx=(0, 6))
   self.logFilterVar = StringVar()
-  self.logFilterVar.trace_add("write", lambda *_: self.filterLogDisplay())
+  self.logFilterVar.trace_add("write", lambda *_: self._onLogFilterChanged())
   self.logFilterEntry = Entry(logFilterBar, textvariable=self.logFilterVar, width=24)
   self.logFilterEntry.pack(side=LEFT, padx=(0, 10))
   self.logLevelVar = StringVar(value="All")
   self.logLevelCombo = Combobox(logFilterBar, textvariable=self.logLevelVar, values=["All", "Errors only", "Info only"], state="readonly", width=12)
   self.logLevelCombo.pack(side=LEFT, padx=(0, 10))
-  self.logLevelCombo.bind("<<ComboboxSelected>>", lambda e: self.filterLogDisplay())
+  self.logLevelCombo.bind("<<ComboboxSelected>>", lambda e: self._applyLogFilterNow())
+  self.logOmissionVar = StringVar(value="")
+  self.logOmissionLabel = Label(logFilterBar, textvariable=self.logOmissionVar, style="Detail.TLabel")
+  self.logOmissionLabel.pack(side=LEFT, padx=(0, 8))
   self.autoScrollBtn = Button(logFilterBar, text="Auto-scroll: ON", command=self.toggleAutoScroll)
   self.autoScrollBtn.pack(side=RIGHT)
 
@@ -562,13 +659,28 @@ class MainUi(UiRoot):
   self.logText.text.tag_configure("error", foreground="#FF6961" if dark else "#C93435")
   self.logText.text.tag_configure("info", foreground=self.logText.text.cget("foreground"))
   self.logText.pack(fill=BOTH, expand=True)
-  self.rawLogEntries = []
 
   self.setCameraBusy(False)
   self.redirectStreams()
   self.updateNavHighlight()
   self.startCameraMonitor()
   self._setupScrollClasses()
+  self._setupNavShortcuts()
+
+ def _setupNavShortcuts(self):
+  for idx in (0, 1, 2):
+   key_num = idx + 1
+   try:
+    if sys.platform == "darwin":
+     self.bind_all("<Command-Key-%d>" % key_num, lambda e, i=idx: self._onNavShortcut(i))
+    self.bind_all("<Control-Key-%d>" % key_num, lambda e, i=idx: self._onNavShortcut(i))
+   except Exception:
+    pass
+
+ def _onNavShortcut(self, idx):
+  if 0 <= idx < len(getattr(self, "navButtons", [])):
+   self.selectTab(idx)
+  return "break"
 
  def _setupScrollClasses(self):
   """Bind StoreScrollable class events across TouchpadScroll, MouseWheel, and Linux buttons."""
@@ -634,14 +746,8 @@ class MainUi(UiRoot):
   return "break"
 
  def _runSafely(self, func):
-  """Thread-safe dispatch to the main GUI thread via UiRoot queue."""
-  try:
-   UiRoot.run(self, func)
-  except Exception:
-   try:
-    self.after(0, func)
-   except Exception:
-    pass
+  """Thread-safe dispatch to the main GUI thread via UiRoot queue only."""
+  self.run(func)
 
  def selectTab(self, idx):
   self.notebook.select(idx)
@@ -660,12 +766,15 @@ class MainUi(UiRoot):
   if self.autoScroll:
    self.logText.text.see(END)
 
+ def _canPollCameraMonitor(self):
+  return not bool(getattr(self, "cameraBusy", False) or getattr(self, "fetchingInfo", False))
+
  def startCameraMonitor(self):
   threading.Thread(target=self._cameraMonitorWorker, daemon=True).start()
 
  def _cameraMonitorWorker(self):
   while hasattr(self, "abortMonitor") and not self.abortMonitor.is_set():
-   if not self.cameraBusy:
+   if self._canPollCameraMonitor():
     try:
      import inspect
      sig = inspect.signature(checkCameraConnection)
@@ -719,12 +828,21 @@ class MainUi(UiRoot):
 
  def onCameraStatusUpdate(self, info):
   appConnected = bool(info and info.get("appConnected"))
-  physical = bool(info and (info.get("physicalDetected") or info.get("connected") or "USB" in str(info.get("status", "")) or info.get("status") in ("access_denied", "unverified", "multiple_devices")))
+  physical = bool(info and (info.get("physicalDetected") or info.get("connected") or "USB" in str(info.get("status", "")) or info.get("status") in ("access_denied", "unverified", "multiple_devices", "msc_excluded", "wrong_mode", "unsupported_mode")))
   status = info.get("status") if info else "disconnected"
   self.lastReportedPhysical = physical
   just_connected = appConnected and not getattr(self, "cameraConnected", False)
   backend_busy = bool(info and info.get("busy"))
   self.lastReportedBackendBusy = backend_busy
+
+  new_session_key = (
+   appConnected,
+   (info.get("name") or info.get("model")) if isinstance(info, dict) else None,
+   (info.get("serial") or info.get("raw_serial")) if isinstance(info, dict) else None,
+  ) if appConnected else (False, None, None)
+  if getattr(self, "_lastCameraSessionKey", (False, None, None)) != new_session_key:
+   self._lastCameraSessionKey = new_session_key
+   self._cameraSessionId = getattr(self, "_cameraSessionId", 0) + 1
 
   if getattr(self, "lastReportedState", None) != (appConnected, status):
    self.lastReportedState = (appConnected, status)
@@ -748,12 +866,8 @@ class MainUi(UiRoot):
      self.cameraInstallEnabled = bool(info["app_installation_supported"])
      self.supportReason = info.get("app_installation_reason") or ("Ready to install." if self.cameraInstallEnabled else "Not supported.")
    else:
-    if backend_busy:
-     self.cameraInstallEnabled = False
-     self.supportReason = "Camera is currently busy."
-    else:
-     self.cameraInstallEnabled = True
-     self.supportReason = ""
+    self.cameraInstallEnabled = False
+    self.supportReason = "Camera is currently busy." if backend_busy else (info.get("app_installation_reason") if hasattr(info, "get") and info.get("app_installation_reason") else "Camera installation eligibility is unverified.")
 
    self.usbStatusVar.set("● Connected: %s (%s)" % (info.get("name", "Camera"), info.get("mode", "MTP")))
    if hasattr(self, "infoFrame") and hasattr(self.infoFrame, "showConnectedCamera"):
@@ -767,11 +881,16 @@ class MainUi(UiRoot):
    self.cameraConnected = False
    self.cameraActionsEnabled = False
    self.cameraInstallEnabled = False
+   mode_str = str(info.get("mode") or "")
    if status == "multiple_devices":
     reason = info.get("failure_reason") or "Multiple Sony cameras detected. Connect only one Sony camera at a time."
     self.supportReason = reason
     self.usbStatusVar.set("○ Multiple Sony cameras connected")
-   elif "access_denied" in status:
+   elif "Mass Storage" in mode_str or "MSC" in mode_str or status in ("msc_excluded", "wrong_mode", "unsupported_mode"):
+    reason = info.get("failure_reason") or "Camera is in Mass Storage mode. Switch USB Connection to MTP in the camera Setup menu."
+    self.supportReason = reason
+    self.usbStatusVar.set("○ USB Mass Storage — MTP unavailable")
+   elif "access_denied" in str(status):
     reason = info.get("failure_reason") or "USB access denied."
     self.supportReason = reason
     self.usbStatusVar.set("○ USB detected, MTP unavailable")
@@ -801,6 +920,7 @@ class MainUi(UiRoot):
  def reconnectCamera(self):
   if self.cameraBusy:
    return
+  self._cameraSessionId = getattr(self, "_cameraSessionId", 0) + 1
   self.usbStatusVar.set("Scanning USB…")
   threading.Thread(target=self._manualProbeWorker, daemon=True).start()
 
@@ -820,6 +940,33 @@ class MainUi(UiRoot):
   info = checkCameraConnection(self.driverName)
   self.onCameraStatusUpdate(info)
 
+ def _buildFilteredLogSnapshot(self):
+  raw_entries = getattr(self, "rawLogEntries", None)
+  if not raw_entries:
+   return self.logText.text.get("1.0", END).rstrip()
+  q = self.logFilterVar.get() if hasattr(self, "logFilterVar") else ""
+  q_low = q.lower()
+  level = self.logLevelVar.get() if hasattr(self, "logLevelVar") else "All"
+  omitted = getattr(self, "omittedLogCount", 0)
+  lines = []
+  for ts, text, tag in list(raw_entries):
+   if level == "Errors only" and tag != "error":
+    continue
+   if level == "Info only" and tag != "info":
+    continue
+   if q_low and q_low not in text.lower():
+    continue
+   lines.append("[%s] %s" % (ts, text))
+  header_parts = []
+  if level != "All" or q != "" or omitted > 0:
+   scope_desc = "level=%s" % level
+   if q != "":
+    scope_desc += ', filter="%s"' % q
+   if omitted > 0:
+    scope_desc += ", %d older lines omitted (retaining latest %d)" % (omitted, getattr(self, "maxLogEntries", 5000))
+   header_parts.append("# Activity Log Snapshot (%s)" % scope_desc)
+  return "\n".join(header_parts + lines)
+
  def exportLog(self):
   filename = asksaveasfilename(
    parent=self,
@@ -831,8 +978,9 @@ class MainUi(UiRoot):
   )
   if filename:
    try:
+    snapshot = self._buildFilteredLogSnapshot() if hasattr(self, "_buildFilteredLogSnapshot") else self.logText.text.get("1.0", END).rstrip()
     with open(filename, "w", encoding="utf-8") as f:
-     f.write(self.logText.text.get("1.0", END).rstrip())
+     f.write(snapshot)
     print("Activity log saved to %s" % filename)
    except Exception as e:
     showerror("Cannot save log", str(e))
@@ -849,16 +997,67 @@ class MainUi(UiRoot):
      current_block = []
   if current_block:
    error_blocks.append("\n".join(current_block))
-  text = "\n\n".join(error_blocks) if error_blocks else "No errors in log."
+  omitted = getattr(self, "omittedLogCount", 0)
+  prefix = ""
+  if omitted > 0:
+   prefix = "[Warning: %d older log lines were omitted/evicted; earlier error or traceback context may be missing.]\n\n" % omitted
+  body = "\n\n".join(error_blocks) if error_blocks else "No errors in log."
+  text = prefix + body
   self.clipboard_clear()
   self.clipboard_append(text)
   print("Copied %d complete error blocks to clipboard" % len(error_blocks))
 
+ def _onLogFilterChanged(self):
+  self._filterGeneration = getattr(self, "_filterGeneration", 0) + 1
+  self._pendingFilterAppends = []
+  self._pendingFilterEvictions = 0
+  if getattr(self, "_logFilterAfterId", None) is not None:
+   try:
+    self.after_cancel(self._logFilterAfterId)
+   except Exception:
+    pass
+   self._logFilterAfterId = None
+  if getattr(self, "_logFilterChunkAfterId", None) is not None:
+   try:
+    self.after_cancel(self._logFilterChunkAfterId)
+   except Exception:
+    pass
+   self._logFilterChunkAfterId = None
+  debounce = getattr(self, "FILTER_DEBOUNCE_MS", 150)
+  try:
+   self._logFilterAfterId = self.after(debounce, self._applyLogFilterNow)
+  except Exception:
+   self.filterLogDisplay()
+
+ def _applyLogFilterNow(self):
+  if getattr(self, "_logFilterAfterId", None) is not None:
+   try:
+    self.after_cancel(self._logFilterAfterId)
+   except Exception:
+    pass
+   self._logFilterAfterId = None
+  self.filterLogDisplay()
+
  def filterLogDisplay(self):
+  if getattr(self, "_logFilterAfterId", None) is not None:
+   try:
+    self.after_cancel(self._logFilterAfterId)
+   except Exception:
+    pass
+   self._logFilterAfterId = None
+  if getattr(self, "_logFilterChunkAfterId", None) is not None:
+   try:
+    self.after_cancel(self._logFilterChunkAfterId)
+   except Exception:
+    pass
+   self._logFilterChunkAfterId = None
+  self._pendingFilterAppends = []
+  self._pendingFilterEvictions = 0
+  self._filterGeneration = getattr(self, "_filterGeneration", 0) + 1
+  gen = self._filterGeneration
   q = self.logFilterVar.get().lower() if hasattr(self, "logFilterVar") else ""
   level = self.logLevelVar.get() if hasattr(self, "logLevelVar") else "All"
-  self.logText.text.configure(state=NORMAL)
-  self.logText.text.delete("1.0", END)
+  matching = []
   for timestamp, text, tag in getattr(self, "rawLogEntries", []):
    if level == "Errors only" and tag != "error":
     continue
@@ -866,100 +1065,355 @@ class MainUi(UiRoot):
     continue
    if q and q not in text.lower():
     continue
-   line = "[%s] %s\n" % (timestamp, text)
-   self.logText.text.insert(END, line, tag)
+   matching.append((tag, "[%s] %s\n" % (timestamp, text)))
+
+  chunk_size = getattr(self, "FILTER_CHUNK_SIZE", 1000)
+  first_batch = matching[:chunk_size]
+  remaining = matching[chunk_size:]
+
+  saved_sel_ranges = []
+  saved_sel_text = ""
+  try:
+   y_top, y_bottom = self.logText.text.yview()
+   raw_sel = self.logText.text.tag_ranges("sel")
+   has_sel = bool(raw_sel)
+   if has_sel:
+    saved_sel_ranges = [str(idx) for idx in raw_sel]
+    if len(saved_sel_ranges) >= 2:
+     saved_sel_text = self.logText.text.get(saved_sel_ranges[0], saved_sel_ranges[1])
+   if y_bottom < 0.98 or has_sel:
+    self.autoScroll = False
+    if hasattr(self, "autoScrollBtn"):
+     self.autoScrollBtn.config(text="Resume auto-scroll")
+  except Exception:
+   pass
+  self._savedFilterSelection = (saved_sel_text, saved_sel_ranges)
+
+  self.logText.text.configure(state=NORMAL)
+  self.logText.text.delete("1.0", END)
+  runs = []
+  for tag, formatted in first_batch:
+   if runs and runs[-1][0] == tag:
+    runs[-1] = (tag, runs[-1][1] + formatted)
+   else:
+    runs.append((tag, formatted))
+  for run_tag, run_text in runs:
+   self.logText.text.insert(END, run_text, run_tag)
+  sel_info = getattr(self, "_savedFilterSelection", None)
+  if sel_info and (sel_info[0] or sel_info[1]):
+   try:
+    sel_text, sel_ranges = sel_info
+    if sel_text:
+     pos = self.logText.text.search(sel_text, "1.0", END)
+     if pos:
+      self.logText.text.tag_remove("sel", "1.0", END)
+      self.logText.text.tag_add("sel", pos, "%s+%dc" % (pos, len(sel_text)))
+    elif len(sel_ranges) >= 2 and self.logText.text.compare(sel_ranges[0], "<", "end-1c"):
+     self.logText.text.tag_remove("sel", "1.0", END)
+     self.logText.text.tag_add("sel", sel_ranges[0], sel_ranges[1])
+   except Exception:
+    pass
   self.logText.text.configure(state=DISABLED)
-  if getattr(self, "autoScroll", True):
+  if remaining and hasattr(self, "after"):
+   self._logFilterChunkAfterId = self.after(4, lambda g=gen, rem=remaining: self._renderFilterChunk(g, rem))
+  elif getattr(self, "autoScroll", True):
    self.logText.text.see(END)
 
+ def _renderFilterChunk(self, gen, remaining):
+  self._logFilterChunkAfterId = None
+  if getattr(self, "_closed", False) or gen != getattr(self, "_filterGeneration", 0):
+   return
+  try:
+   y_top, y_bottom = self.logText.text.yview()
+   has_sel = bool(self.logText.text.tag_ranges("sel"))
+   if y_bottom < 0.98 or has_sel:
+    self.autoScroll = False
+    if hasattr(self, "autoScrollBtn"):
+     self.autoScrollBtn.config(text="Resume auto-scroll")
+  except Exception:
+   pass
+  chunk_size = getattr(self, "FILTER_CHUNK_SIZE", 1000)
+  batch = remaining[:chunk_size]
+  rest = remaining[chunk_size:]
+  runs = []
+  for tag, formatted in batch:
+   if runs and runs[-1][0] == tag:
+    runs[-1] = (tag, runs[-1][1] + formatted)
+   else:
+    runs.append((tag, formatted))
+  self.logText.text.configure(state=NORMAL)
+  for run_tag, run_text in runs:
+   self.logText.text.insert(END, run_text, run_tag)
+  sel_info = getattr(self, "_savedFilterSelection", None)
+  if sel_info and (sel_info[0] or sel_info[1]):
+   try:
+    sel_text, sel_ranges = sel_info
+    if sel_text:
+     pos = self.logText.text.search(sel_text, "1.0", END)
+     if pos:
+      self.logText.text.tag_remove("sel", "1.0", END)
+      self.logText.text.tag_add("sel", pos, "%s+%dc" % (pos, len(sel_text)))
+    elif len(sel_ranges) >= 2 and self.logText.text.compare(sel_ranges[0], "<", "end-1c"):
+     self.logText.text.tag_remove("sel", "1.0", END)
+     self.logText.text.tag_add("sel", sel_ranges[0], sel_ranges[1])
+   except Exception:
+    pass
+  self.logText.text.configure(state=DISABLED)
+  if rest and hasattr(self, "after"):
+   self._logFilterChunkAfterId = self.after(4, lambda g=gen, rem=rest: self._renderFilterChunk(g, rem))
+  else:
+   pending_runs = getattr(self, "_pendingFilterAppends", None)
+   pending_evict = getattr(self, "_pendingFilterEvictions", 0)
+   self._pendingFilterAppends = []
+   self._pendingFilterEvictions = 0
+   if pending_runs or pending_evict > 0:
+    self._appendFormattedRunsToText(pending_runs or [], evicted_matching_count=pending_evict)
+   elif getattr(self, "autoScroll", True):
+    self.logText.text.see(END)
+
+ def setDownloadBusy(self, busy):
+  self.downloadBusy = bool(busy)
+  self.setCameraBusy(getattr(self, "cameraBusy", False))
+
  def setCameraBusy(self, busy):
-  self.cameraBusy = busy
-  state = DISABLED if busy else NORMAL
-  cameraState = state if getattr(self, "cameraActionsEnabled", True) else DISABLED
+  self.cameraBusy = bool(busy)
+  dl_busy = bool(getattr(self, "downloadBusy", False))
+  any_busy = bool(self.cameraBusy or dl_busy)
+  state = DISABLED if any_busy else NORMAL
+  cameraState = (DISABLED if self.cameraBusy else NORMAL) if getattr(self, "cameraActionsEnabled", True) else DISABLED
   if hasattr(self, "infoFrame") and hasattr(self.infoFrame, "infoButton"):
    self.infoFrame.infoButton.config(state=cameraState)
   if hasattr(self, "installerFrame") and hasattr(self.installerFrame, "updateInstallButton"):
    self.installerFrame.updateInstallButton()
   elif hasattr(self, "installerFrame") and hasattr(self.installerFrame, "installButton"):
-   self.installerFrame.installButton.config(state=cameraState)
+   self.installerFrame.installButton.config(state=DISABLED if any_busy or not getattr(self, "cameraActionsEnabled", True) else NORMAL)
   for name in ["downloadButton", "apkSelectButton", "apkRevealButton", "appLoadButton", "appDownloadButton"]:
    button = getattr(self.installerFrame, name, None)
    if button is not None:
-    if not busy and name == "appDownloadButton":
+    if not any_busy and name == "appDownloadButton":
      selected = self.installerFrame.getSelectedApp() if hasattr(self.installerFrame, "getSelectedApp") else None
      button.config(state=NORMAL if selected else DISABLED)
-    elif not busy and name == "apkRevealButton":
+    elif not any_busy and name == "apkRevealButton":
      apkPath = self.installerFrame.getSelectedApk() if hasattr(self.installerFrame, "getSelectedApk") else None
      button.config(state=NORMAL if (apkPath and os.path.isfile(apkPath)) else DISABLED)
     else:
      button.config(state=state)
   combo = getattr(self.installerFrame, "appCombo", None)
   if combo is not None:
-   combo.config(state=DISABLED if busy else "readonly")
+   combo.config(state=DISABLED if any_busy else "readonly")
   search = getattr(self.installerFrame, "searchEntry", None)
   if search is not None:
-   search.config(state=DISABLED if busy else NORMAL)
+   search.config(state=DISABLED if any_busy else NORMAL)
   if hasattr(self, "reconnectButton"):
-   self.reconnectButton.config(state=state)
+   self.reconnectButton.config(state=DISABLED if self.cameraBusy else NORMAL)
   if hasattr(self.installerFrame, "setStoreBusy"):
-   self.installerFrame.setStoreBusy(busy)
+   self.installerFrame.setStoreBusy(any_busy)
+  if hasattr(self.installerFrame, "cancelDownloadButton"):
+   can_cancel = bool(dl_busy and not self.cameraBusy)
+   self.installerFrame.cancelDownloadButton.config(state=NORMAL if can_cancel else DISABLED)
   if hasattr(self, "statusVar"):
-   self.statusVar.set("An operation is running…" if busy else "Camera not connected — connect camera in MTP mode." if not self.cameraActionsEnabled else "Idle.")
+   if self.cameraBusy:
+    self.statusVar.set("An operation is running…")
+   elif dl_busy:
+    self.statusVar.set("Downloading APK…")
+   elif not getattr(self, "cameraActionsEnabled", True):
+    self.statusVar.set("Camera not connected — connect camera in MTP mode.")
+   else:
+    self.statusVar.set("Idle.")
 
  def _processQueue(self):
-  while True:
-   try:
-    func = self._queue.get(block=False)
-   except Empty:
-    break
-   try:
-    func()
-   except Exception:
-    traceback.print_exc()
-  if not getattr(self, "_closed", False):
-   self._queueAfterId = self.after(100, self._processQueue)
-
- def close(self):
-  if self.cameraBusy:
-   showerror("Operation in progress", "Wait for the current operation to finish before closing. If the camera is in use, keep it connected.")
-   return
-  self.destroy()
-
- def destroy(self):
-  self._closed = True
-  if getattr(self, "_queueAfterId", None):
+  if getattr(self, "_queueAfterId", None) is not None:
    try:
     self.after_cancel(self._queueAfterId)
    except Exception:
     pass
    self._queueAfterId = None
+  slice_start = time.perf_counter()
+  processed = 0
+  max_items = getattr(self, "QUEUE_MAX_SLICE_ITEMS", 40)
+  max_sec = getattr(self, "QUEUE_MAX_SLICE_SEC", 0.008)
+  self._inQueueSlice = True
+  try:
+   while processed < max_items:
+    try:
+     func = self._queue.get(block=False)
+    except Empty:
+     break
+    processed += 1
+    try:
+     func()
+    except Exception:
+     traceback.print_exc()
+    if processed >= max_items or (time.perf_counter() - slice_start) >= max_sec:
+     break
+  finally:
+   self._inQueueSlice = False
+   if getattr(self, "_sliceLogBatch", None) or getattr(self, "_sliceLogEvictedCount", 0) > 0:
+    self._flushSliceLogBatch()
+  if not getattr(self, "_closed", False):
+   delay = getattr(self, "QUEUE_ACTIVE_DELAY_MS", 8) if not self._queue.empty() else getattr(self, "QUEUE_IDLE_DELAY_MS", 16)
+   self._queueAfterId = self.after(delay, self._processQueue)
+
+ def close(self):
+  if getattr(self, "cameraBusy", False) or getattr(self, "fetchingInfo", False) or getattr(self, "lastReportedBackendBusy", False):
+   showerror("Operation in progress", "Wait for the current operation to finish before closing. If the camera is in use, keep it connected.")
+   return
+  if getattr(self, "downloadBusy", False) and hasattr(self, "installerFrame") and hasattr(self.installerFrame, "cancelDownload"):
+   self.installerFrame.cancelDownload()
+  self.destroy()
+
+ def destroy(self):
+  self._closed = True
+  for timer_attr in ("_queueAfterId", "_logFilterAfterId", "_logFilterChunkAfterId"):
+   tid = getattr(self, timer_attr, None)
+   if tid is not None:
+    try:
+     self.after_cancel(tid)
+    except Exception:
+     pass
+    setattr(self, timer_attr, None)
   if hasattr(self, "abortMonitor"):
    self.abortMonitor.set()
   abort = getattr(self, "abortSync", None)
   if abort is not None:
    abort.set()
+  if hasattr(self, "_origStreams") and self._origStreams:
+   sys.stdout, sys.stderr = self._origStreams
+   self._origStreams = None
   UiRoot.destroy(self)
+
+ def _updateOmissionNotice(self):
+  if not hasattr(self, "logOmissionVar"):
+   return
+  omitted = getattr(self, "omittedLogCount", 0)
+  max_entries = getattr(self, "maxLogEntries", 5000)
+  if omitted > 0:
+   self.logOmissionVar.set("{:,} older lines omitted (retaining latest {:,})".format(omitted, max_entries))
+  else:
+   self.logOmissionVar.set("")
+
+ def _appendFormattedRunsToText(self, runs, evicted_matching_count=0):
+  if not runs and evicted_matching_count <= 0:
+   return
+  if getattr(self, "_logFilterChunkAfterId", None) is not None or getattr(self, "_logFilterAfterId", None) is not None:
+   if getattr(self, "_logFilterChunkAfterId", None) is not None:
+    if not hasattr(self, "_pendingFilterAppends") or self._pendingFilterAppends is None:
+     self._pendingFilterAppends = []
+    self._pendingFilterAppends.extend(runs)
+    self._pendingFilterEvictions = getattr(self, "_pendingFilterEvictions", 0) + evicted_matching_count
+    return
+  text_widget = self.logText.text
+  try:
+   y_top, y_bottom = text_widget.yview()
+   has_sel = bool(text_widget.tag_ranges("sel"))
+   if y_bottom < 0.98 or has_sel:
+    self.autoScroll = False
+    if hasattr(self, "autoScrollBtn"):
+     self.autoScrollBtn.config(text="Resume auto-scroll")
+  except Exception:
+   pass
+  text_widget.configure(state=NORMAL)
+  try:
+   for run_tag, run_text in runs:
+    text_widget.insert(END, run_text, run_tag)
+   if evicted_matching_count > 0:
+    try:
+     text_widget.delete("1.0", "%d.0" % (evicted_matching_count + 1))
+    except Exception:
+     pass
+  finally:
+   text_widget.configure(state=DISABLED)
+  if getattr(self, "autoScroll", True):
+   text_widget.see(END)
+
+ def _flushSliceLogBatch(self):
+  batch = getattr(self, "_sliceLogBatch", None)
+  evicted_matching = getattr(self, "_sliceLogEvictedCount", 0)
+  self._sliceLogBatch = []
+  self._sliceLogEvictedCount = 0
+  if not batch and evicted_matching <= 0:
+   return
+  runs = []
+  for tag, formatted in (batch or []):
+   if runs and runs[-1][0] == tag:
+    runs[-1] = (tag, runs[-1][1] + formatted)
+   else:
+    runs.append((tag, formatted))
+  self._appendFormattedRunsToText(runs, evicted_matching_count=evicted_matching)
 
  def log(self, msg, error=False):
   self.logBuffers[error] += msg
-  while "\n" in self.logBuffers[error]:
-   line, self.logBuffers[error] = self.logBuffers[error].split("\n", 1)
+  if "\n" not in self.logBuffers[error]:
+   return
+  parts = self.logBuffers[error].split("\n")
+  self.logBuffers[error] = parts.pop()
+  ts = datetime.now().strftime("%H:%M:%S")
+  q = self.logFilterVar.get().lower() if hasattr(self, "logFilterVar") else ""
+  level = self.logLevelVar.get() if hasattr(self, "logLevelVar") else "All"
+  has_raw = hasattr(self, "rawLogEntries")
+  batch_entries = []
+  for line in parts:
    if not line:
     continue
    tag = "error" if error or line.startswith(("Error:", "No devices found", "Operation timed out")) else "info"
-   ts = datetime.now().strftime("%H:%M:%S")
-   if hasattr(self, "rawLogEntries"):
-    self.rawLogEntries.append((ts, line, tag))
-   # Check if matches current filter
-   q = self.logFilterVar.get().lower() if hasattr(self, "logFilterVar") else ""
-   level = self.logLevelVar.get() if hasattr(self, "logLevelVar") else "All"
+   batch_entries.append((ts, line, tag))
+
+  if not batch_entries:
+   return
+
+  evicted_matching_count = 0
+  if has_raw:
+   max_entries = getattr(self, "maxLogEntries", 5000)
+   prev_len = len(self.rawLogEntries)
+   batch_len = len(batch_entries)
+   total_len = prev_len + batch_len
+   if total_len > max_entries:
+    overflow = total_len - max_entries
+    evicted_from_prev = min(prev_len, overflow)
+    for _, ev_line, ev_tag in self.rawLogEntries[:evicted_from_prev]:
+     if (level == "Errors only" and ev_tag != "error") or (level == "Info only" and ev_tag != "info") or (q and q not in ev_line.lower()):
+      continue
+     evicted_matching_count += 1
+    if overflow <= prev_len:
+     del self.rawLogEntries[:overflow]
+     surviving_batch = batch_entries
+    else:
+     self.rawLogEntries.clear()
+     surviving_batch = batch_entries[-max_entries:]
+    self.rawLogEntries.extend(surviving_batch)
+    self.omittedLogCount = getattr(self, "omittedLogCount", 0) + overflow
+    if hasattr(self, "_updateOmissionNotice"):
+     self._updateOmissionNotice()
+   else:
+    surviving_batch = batch_entries
+    self.rawLogEntries.extend(surviving_batch)
+  else:
+   surviving_batch = batch_entries
+
+  new_matching = []
+  for entry_ts, line, tag in surviving_batch:
    if (level == "Errors only" and tag != "error") or (level == "Info only" and tag != "info") or (q and q not in line.lower()):
     continue
-   text = "[%s] %s\n" % (ts, line)
-   self.logText.text.configure(state=NORMAL)
-   self.logText.text.insert(END, text, tag)
-   self.logText.text.configure(state=DISABLED)
-   # Check if user scrolled away from bottom or has active text selection
+   new_matching.append((tag, "[%s] %s\n" % (entry_ts, line)))
+
+  if not new_matching and evicted_matching_count <= 0:
+   return
+
+  if getattr(self, "_inQueueSlice", False) and hasattr(self, "_sliceLogBatch"):
+   self._sliceLogBatch.extend(new_matching)
+   self._sliceLogEvictedCount = getattr(self, "_sliceLogEvictedCount", 0) + evicted_matching_count
+   return
+
+  runs = []
+  for tag, formatted in new_matching:
+   if runs and runs[-1][0] == tag:
+    runs[-1] = (tag, runs[-1][1] + formatted)
+   else:
+    runs.append((tag, formatted))
+
+  if hasattr(self, "_appendFormattedRunsToText"):
+   self._appendFormattedRunsToText(runs, evicted_matching_count=evicted_matching_count)
+  else:
    try:
     y_top, y_bottom = self.logText.text.yview()
     has_sel = bool(self.logText.text.tag_ranges("sel"))
@@ -969,24 +1423,52 @@ class MainUi(UiRoot):
       self.autoScrollBtn.config(text="Resume auto-scroll")
    except Exception:
     pass
+   self.logText.text.configure(state=NORMAL)
+   for run_tag, run_text in runs:
+    self.logText.text.insert(END, run_text, run_tag)
+   self.logText.text.configure(state=DISABLED)
    if getattr(self, "autoScroll", True):
     self.logText.text.see(END)
 
  def copyLog(self):
+  snapshot = self._buildFilteredLogSnapshot() if hasattr(self, "_buildFilteredLogSnapshot") else self.logText.text.get("1.0", END).rstrip()
   self.clipboard_clear()
-  self.clipboard_append(self.logText.text.get("1.0", END).rstrip())
+  self.clipboard_append(snapshot)
 
  def clearLog(self):
+  self._logGeneration = getattr(self, "_logGeneration", 0) + 1
+  self._filterGeneration = getattr(self, "_filterGeneration", 0) + 1
+  for timer_attr in ("_logFilterAfterId", "_logFilterChunkAfterId"):
+   tid = getattr(self, timer_attr, None)
+   if tid is not None:
+    try:
+     self.after_cancel(tid)
+    except Exception:
+     pass
+    setattr(self, timer_attr, None)
   self.logBuffers = {False: "", True: ""}
   self.rawLogEntries = []
+  self.omittedLogCount = 0
+  self._pendingFilterAppends = []
+  self._pendingFilterEvictions = 0
+  self._sliceLogBatch = []
+  self._sliceLogEvictedCount = 0
+  if hasattr(self, "_updateOmissionNotice"):
+   self._updateOmissionNotice()
   self.logText.text.configure(state=NORMAL)
   self.logText.text.delete("1.0", END)
   self.logText.text.configure(state=DISABLED)
 
  def redirectStreams(self):
+  self._origStreams = (sys.stdout, sys.stderr)
   for stream in ["stdout", "stderr"]:
-   callback = lambda text, error=stream == "stderr": self.run(lambda: self.log(text, error))
-   setattr(sys, stream, PrintRedirector(callback, getattr(sys, stream)))
+   is_err = (stream == "stderr")
+   def make_cb(err=is_err):
+    def _cb(text):
+     gen = getattr(self, "_logGeneration", 0)
+     self.run(lambda t=text, e=err, g=gen: self.log(t, e) if getattr(self, "_logGeneration", 0) == g else None)
+    return _cb
+   setattr(sys, stream, PrintRedirector(make_cb(), getattr(sys, stream)))
 
 
 class InfoFrame(UiFrame):
@@ -1410,12 +1892,23 @@ class InstallerFrame(UiFrame):
   self.cardDownloadButtons = []
   self._pendingScrollUnits = 0
   self._scrollTimerId = None
+  self._activeTaskGen = 0
+  self.downloadAbortEvent = None
+  self._progressIndeterminateActive = False
+  self._renderedCards = {}
+  self._renderedCardKeys = []
+  self._focusedStorePkg = None
+  self._lastCanvasWidth = None
 
   # Progress Section - pinned to bottom
   progressSection = Frame(self)
   progressSection.pack(side=BOTTOM, fill=X, pady=(4, 0))
+  progressTop = Frame(progressSection)
+  progressTop.pack(fill=X, pady=(0, 2))
   self.progressText = StringVar(value="No operation running.")
-  Label(progressSection, textvariable=self.progressText, style="Detail.TLabel").pack(anchor=W, pady=(0, 2))
+  Label(progressTop, textvariable=self.progressText, style="Detail.TLabel").pack(side=LEFT, anchor=W)
+  self.cancelDownloadButton = Button(progressTop, text="Cancel Download", command=self.cancelDownload, padding=(6, 1), state=DISABLED)
+  self.cancelDownloadButton.pack(side=RIGHT)
   self.progressBar = Progressbar(progressSection, mode="determinate", maximum=100)
   self.progressBar.pack(fill=X)
 
@@ -1485,6 +1978,15 @@ class InstallerFrame(UiFrame):
   self.renderAppCards()
   self.setAppList([])
   self.startBackgroundSync()
+
+ def _nextTaskGeneration(self):
+  self._activeTaskGen = getattr(self, "_activeTaskGen", 0) + 1
+  return self._activeTaskGen
+
+ def cancelDownload(self):
+  abort_ev = getattr(self, "downloadAbortEvent", None)
+  if abort_ev is not None:
+   abort_ev.set()
 
  def _tagStoreScrollable(self, widget):
   try:
@@ -1566,28 +2068,121 @@ class InstallerFrame(UiFrame):
    if units == 0:
     units = -1 if raw > 0 else 1
    self.canvas.yview_scroll(units, "units")
-  return "break" 
+  return "break"
 
  def _onCanvasConfigure(self, event):
+  if getattr(self, "_lastCanvasWidth", None) == event.width:
+   return
+  self._lastCanvasWidth = event.width
   self.canvas.itemconfig(self.canvasWindow, width=event.width)
   wrap = max(300, event.width - 250)
-  for lbl in getattr(self, "descLabels", []):
+  for lbl in getattr(self, "cardTextLabels", None) or getattr(self, "descLabels", []):
    try:
     lbl.config(wraplength=wrap)
    except Exception:
     pass
 
+ def _ensureRowVisible(self, row):
+  if not hasattr(self, "canvas") or not self.canvas.winfo_ismapped():
+   return
+  try:
+   self.cardsFrame.update_idletasks()
+   bbox = self.canvas.bbox("all")
+   total_h = (bbox[3] - bbox[1]) if bbox else self.cardsFrame.winfo_reqheight()
+   canvas_h = self.canvas.winfo_height()
+   if total_h <= 0 or canvas_h <= 1 or total_h <= canvas_h:
+    return
+   row_top = row.winfo_y()
+   row_h = max(row.winfo_height(), row.winfo_reqheight(), 48)
+   row_bottom = row_top + row_h
+   y_top, y_bottom = self.canvas.yview()
+   vis_top = y_top * total_h
+   vis_bottom = y_top * total_h + canvas_h
+   if row_top < vis_top:
+    self.canvas.yview_moveto(max(0.0, float(row_top) / float(total_h)))
+   elif row_bottom > vis_bottom:
+    target_top = max(0.0, float(row_bottom - canvas_h + 12))
+    self.canvas.yview_moveto(min(1.0, target_top / float(total_h)))
+  except Exception:
+   pass
+
+ def _onCardWidgetFocusIn(self, row, pkg):
+  self._focusedStorePkg = pkg
+  self._ensureRowVisible(row)
+
  def renderAppCards(self, filterQuery=None):
+  q = (filterQuery or "").strip().lower()
+  visible_items = []
+  for pkg, app in self.catalog.items():
+   name = app.get("name", "")
+   author = app.get("author", "")
+   desc = app.get("desc", "")
+   actual_pkg = app.get("package") or pkg
+   if q and q not in name.lower() and q not in pkg.lower() and q not in desc.lower() and q not in author.lower() and q not in actual_pkg.lower():
+    continue
+   visible_items.append((pkg, app))
+
+  visible_keys = [pkg for pkg, _ in visible_items]
+  any_busy = bool(getattr(self.master, "cameraBusy", False) or getattr(self.master, "downloadBusy", False))
+
+  # Fast path: update existing card widgets in place when visible package keys match
+  rendered_cards = getattr(self, "_renderedCards", None)
+  if rendered_cards and getattr(self, "_renderedCardKeys", None) == visible_keys:
+   all_alive = True
+   for pkg in visible_keys:
+    entry = rendered_cards.get(pkg)
+    if not entry or not entry["row"].winfo_exists():
+     all_alive = False
+     break
+   if all_alive:
+    for pkg, app in visible_items:
+     entry = rendered_cards[pkg]
+     name = app.get("name", "")
+     author = app.get("author", "")
+     desc = app.get("desc", "")
+     ver = app.get("version")
+     ver_display = ver if (ver and ver != "Release pending") else "Version unverified"
+     actual_pkg = app.get("package") or pkg
+     caveat = app.get("support_caveats") or app.get("compatibility")
+     title_text = "%s  (%s)" % (name, ver_display)
+     meta_text = "by %s  •  %s" % (author, actual_pkg)
+     if caveat:
+      meta_text += "  •  %s" % caveat
+     if entry["titleLabel"].cget("text") != title_text:
+      entry["titleLabel"].config(text=title_text)
+     if entry["metaLabel"].cget("text") != meta_text:
+      entry["metaLabel"].config(text=meta_text)
+     if entry["descLabel"].cget("text") != desc:
+      entry["descLabel"].config(text=desc)
+     btn = entry["btn"]
+     pkg_cmd = RecipeDownloadTask(self).run if pkg == "com.voxivoid.recipelab" else (lambda p=pkg: self.downloadStoreApp(p))
+     if not app.get("url"):
+      btn.config(text="No APK", command=pkg_cmd, state=DISABLED)
+     else:
+      btn.config(text="Download APK", command=pkg_cmd, state=DISABLED if any_busy else NORMAL)
+    if not hasattr(self, "_lastSyncResult"):
+     self.storeStatusVar.set("%d catalog apps available" % len(self.catalog))
+    return
+
+  prev_y = None
+  if getattr(self, "_renderedCardKeys", None) and hasattr(self, "canvas"):
+   try:
+    prev_y = self.canvas.yview()[0]
+   except Exception:
+    prev_y = None
+  focused_pkg = getattr(self, "_focusedStorePkg", None)
+
   self.cardDownloadButtons = []
   self.descLabels = []
+  self.cardTextLabels = []
+  self._renderedCards = {}
+  self._renderedCardKeys = visible_keys
   for w in self.cardsFrame.winfo_children():
    w.destroy()
   self.cardsFrame.columnconfigure(0, weight=1)
-  q = (filterQuery or "").strip().lower()
-  displayed = 0
-  canvas_w = self.canvas.winfo_width() if hasattr(self, "canvas") else 800
-  wrap_width = max(360, canvas_w - 240)
-  for idx, (pkg, app) in enumerate(self.catalog.items()):
+  canvas_w = self.canvas.winfo_width() if hasattr(self, "canvas") and self.canvas.winfo_width() > 100 else 800
+  wrap_width = max(300, canvas_w - 250)
+  for pkg, app in visible_items:
    name = app.get("name", "")
    author = app.get("author", "")
    desc = app.get("desc", "")
@@ -1595,9 +2190,6 @@ class InstallerFrame(UiFrame):
    ver_display = ver if (ver and ver != "Release pending") else "Version unverified"
    actual_pkg = app.get("package") or pkg
    caveat = app.get("support_caveats") or app.get("compatibility")
-   if q and q not in name.lower() and q not in pkg.lower() and q not in desc.lower() and q not in author.lower() and q not in actual_pkg.lower():
-    continue
-   displayed += 1
    row = Frame(self.cardsFrame, padding=(10, 6))
    row.pack(fill=X, pady=2, padx=4)
    row.columnconfigure(0, weight=1)
@@ -1607,54 +2199,65 @@ class InstallerFrame(UiFrame):
    textBox.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
 
    # Line 1: Name and Version
-   titleLabel = Label(textBox, text="%s  (%s)" % (name, ver_display), style="Subheading.TLabel")
+   titleLabel = Label(textBox, text="%s  (%s)" % (name, ver_display), style="Subheading.TLabel", wraplength=wrap_width)
    titleLabel.pack(anchor=W)
 
    # Line 2: Author, Package, and Compatibility Note
    meta_text = "by %s  •  %s" % (author, actual_pkg)
    if caveat:
     meta_text += "  •  %s" % caveat
-   metaLabel = Label(textBox, text=meta_text, style="Detail.TLabel")
+   metaLabel = Label(textBox, text=meta_text, style="Detail.TLabel", wraplength=wrap_width)
    metaLabel.pack(anchor=W, pady=(1, 2))
 
    # Line 3: Description
-   descLabel = Label(textBox, text=desc, style="Detail.TLabel")
+   descLabel = Label(textBox, text=desc, style="Detail.TLabel", wraplength=wrap_width)
    descLabel.pack(anchor=W)
    self.descLabels.append(descLabel)
-
-   def _onTextBoxConfigure(event, tl=titleLabel, ml=metaLabel, dl=descLabel):
-    alloc_w = max(180, event.width - 4)
-    tl.config(wraplength=alloc_w)
-    ml.config(wraplength=alloc_w)
-    dl.config(wraplength=alloc_w)
-
-   textBox.bind("<Configure>", _onTextBoxConfigure)
+   self.cardTextLabels.extend((titleLabel, metaLabel, descLabel))
 
    # Column 1: Action group docked on the right
    actionBox = Frame(row)
    actionBox.grid(row=0, column=1, sticky="e")
-   btn = None
+   pkg_cmd = RecipeDownloadTask(self).run if pkg == "com.voxivoid.recipelab" else (lambda p=pkg: self.downloadStoreApp(p))
    if not app.get("url"):
-    btn = Button(actionBox, text="No APK", state=DISABLED, padding=(8, 3))
-   elif pkg == "com.voxivoid.recipelab":
-    btn = Button(actionBox, text="Download APK", command=RecipeDownloadTask(self).run, padding=(8, 3))
+    btn = Button(actionBox, text="No APK", command=pkg_cmd, state=DISABLED, padding=(8, 3))
    else:
-    btn = Button(actionBox, text="Download APK", command=lambda p=pkg: self.downloadStoreApp(p), padding=(8, 3))
+    btn = Button(actionBox, text="Download APK", command=pkg_cmd, state=DISABLED if any_busy else NORMAL, padding=(8, 3))
    btn.pack(side=LEFT, padx=(0, 6))
+   btn.bind("<FocusIn>", lambda e, r=row, p=pkg: self._onCardWidgetFocusIn(r, p), add="+")
    self.cardDownloadButtons.append(btn)
    homepage = app.get("homepage")
    if homepage:
-    Button(actionBox, text="Source ↗", command=lambda u=homepage: webbrowser.open_new(u), padding=(6, 3)).pack(side=LEFT)
+    srcBtn = Button(actionBox, text="Source ↗", command=lambda u=homepage: webbrowser.open_new(u), padding=(6, 3))
+    srcBtn.pack(side=LEFT)
+    srcBtn.bind("<FocusIn>", lambda e, r=row, p=pkg: self._onCardWidgetFocusIn(r, p), add="+")
    Separator(self.cardsFrame, orient=HORIZONTAL).pack(fill=X, padx=4, pady=1)
    self._tagStoreScrollable(row)
+   self._renderedCards[pkg] = {
+    "row": row,
+    "titleLabel": titleLabel,
+    "metaLabel": metaLabel,
+    "descLabel": descLabel,
+    "btn": btn,
+   }
   spacer = Frame(self.cardsFrame, height=20)
   spacer.pack(fill=X)
   self._tagStoreScrollable(spacer)
   self.cardsFrame.update_idletasks()
   self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+  if prev_y is not None:
+   try:
+    self.canvas.yview_moveto(prev_y)
+   except Exception:
+    pass
+  if focused_pkg and focused_pkg in self._renderedCards:
+   try:
+    self._renderedCards[focused_pkg]["btn"].focus_set()
+   except Exception:
+    pass
   if not hasattr(self, "_lastSyncResult"):
    self.storeStatusVar.set("%d catalog apps available" % len(self.catalog))
-  if getattr(self.master, "cameraBusy", False):
+  if any_busy:
    self.setStoreBusy(True)
 
  def _bindMouseWheel(self, widget):
@@ -1671,7 +2274,10 @@ class InstallerFrame(UiFrame):
   state = DISABLED if busy else NORMAL
   for btn in getattr(self, "cardDownloadButtons", []):
    try:
-    btn.config(state=state)
+    if str(btn.cget("text")) == "No APK":
+     btn.config(state=DISABLED)
+    else:
+     btn.config(state=state)
    except Exception:
     pass
 
@@ -1686,17 +2292,7 @@ class InstallerFrame(UiFrame):
   threading.Thread(target=self._syncWorker, daemon=True).start()
 
  def _runSafely(self, func):
-  if hasattr(self, "run"):
-   try:
-    self.run(func)
-    return
-   except Exception:
-    pass
-  if hasattr(self, "after"):
-   try:
-    self.after(0, func)
-   except Exception:
-    pass
+  self.run(func)
 
  def _syncWorker(self):
   abort_event = getattr(self.master, "abortSync", None)
@@ -1713,7 +2309,8 @@ class InstallerFrame(UiFrame):
 
  def onCatalogSynced(self, res):
   self._lastSyncResult = res
-  if not getattr(self.master, "cameraBusy", False):
+  any_busy = bool(getattr(self.master, "cameraBusy", False) or getattr(self.master, "downloadBusy", False))
+  if not any_busy:
    self.appLoadButton.config(state=NORMAL)
   else:
    self.appLoadButton.config(state=DISABLED)
@@ -1763,27 +2360,45 @@ class InstallerFrame(UiFrame):
   )
   if not filename:
    return
-  self.master.setCameraBusy(True)
-  self.updateProgress(None, "Downloading %s APK…" % appData.get("name"))
-  threading.Thread(target=self._downloadStoreWorker, args=(appObj, filename), daemon=True).start()
+  task_gen = self._nextTaskGeneration() if hasattr(self, "_nextTaskGeneration") else 0
+  abort_ev = threading.Event()
+  self.downloadAbortEvent = abort_ev
+  _setTaskDownloadBusy(self, True)
+  self.updateProgress(None, "Downloading %s APK…" % appData.get("name"), taskGen=task_gen)
+  threading.Thread(target=self._downloadStoreWorker, args=(appObj, filename, task_gen, abort_ev), daemon=True).start()
 
- def _downloadStoreWorker(self, appObj, filename):
+ def _downloadStoreWorker(self, appObj, filename, task_gen=None, abort_ev=None):
   result = None
   try:
    print("Downloading %s (%s)…" % (appObj.name, appObj.package))
-   result = downloadCatalogApp(appObj, filename, lambda d, t: self.run(lambda: self.updateProgress(100*d/t if t else None, "Downloading %d KB" % (d//1024))))
+   def _prog(d, t):
+    self.run(lambda: self.updateProgress(100*d/t if t else None, "Downloading %d KB" % (d//1024), taskGen=task_gen))
+   result = downloadCatalogApp(appObj, filename, _prog, abort_event=abort_ev)
    print("%s downloaded and validated (%d bytes)." % (result["name"], result["bytes"]))
+  except DownloadCancelledError:
+   print("%s download cancelled." % (appObj.name or "App"))
+   result = "CANCELLED"
   except Exception:
    traceback.print_exc()
-  self._runSafely(lambda: self._downloadStoreDone(result))
+  self._runSafely(lambda: self._downloadStoreDone(result, task_gen, abort_ev))
 
- def _downloadStoreDone(self, result):
-  if result and result.get("path"):
+ def _downloadStoreDone(self, result, task_gen=None, abort_ev=None):
+  if getattr(self, "downloadAbortEvent", None) is abort_ev:
+   self.downloadAbortEvent = None
+  active_gen = getattr(self, "_activeTaskGen", task_gen)
+  is_current = (task_gen is None or active_gen is None or task_gen == active_gen)
+  camera_busy = bool(getattr(self.master, "cameraBusy", False))
+  if result == "CANCELLED":
+   if is_current and not camera_busy:
+    self.updateProgress(0, "Download cancelled", taskGen=task_gen)
+  elif isinstance(result, dict) and result.get("path"):
    self.setApkFile(result["path"])
-   self.updateProgress(100, "%s downloaded and validated; not installed" % result["name"])
+   if is_current and not camera_busy:
+    self.updateProgress(100, "%s downloaded and validated; not installed" % result["name"], taskGen=task_gen)
   else:
-   self.updateProgress(0, "Download failed; check Activity log")
-  self.master.setCameraBusy(False)
+   if is_current and not camera_busy:
+    self.updateProgress(0, "Download failed; check Activity log", taskGen=task_gen)
+  _setTaskDownloadBusy(self, False)
 
  def getMode(self):
   return self.modeVar.get()
@@ -1852,7 +2467,7 @@ class InstallerFrame(UiFrame):
   cameraReady = bool(getattr(master, "cameraActionsEnabled", False) and getattr(master, "cameraConnected", False))
   installSupported = getattr(master, "cameraInstallEnabled", True) is not False
   backendBusy = bool(getattr(master, "lastReportedBackendBusy", False))
-  busy = bool(getattr(master, "cameraBusy", False) or backendBusy)
+  busy = bool(getattr(master, "cameraBusy", False) or backendBusy or getattr(master, "downloadBusy", False))
   apkPath = self.getSelectedApk()
   hasValidApk = bool(apkPath and os.path.isfile(apkPath) and getattr(self, "_apkIsValid", True))
   canInstall = cameraReady and installSupported and hasValidApk and not busy
@@ -1875,7 +2490,7 @@ class InstallerFrame(UiFrame):
    master = self.master
    if getattr(master, "lastReportedPhysical", False):
     reason = installReason or getattr(master, "supportReason", "")
-    if reason and "Multiple" in reason:
+    if reason and reason != "app connection unavailable":
      self.apkStatusNote.set(reason)
     else:
      self.apkStatusNote.set("USB device detected on bus, but MTP session unavailable.")
@@ -1955,28 +2570,52 @@ class InstallerFrame(UiFrame):
    return apps[self.appCombo.current() - 1]
   return None
 
- def updateProgress(self, percent, message):
-  self.progressBar.stop()
+ def updateProgress(self, percent, message, taskGen=None):
+  active_gen = getattr(self, "_activeTaskGen", taskGen)
+  if taskGen is not None and active_gen is not None and taskGen != active_gen:
+   return
   if percent is None:
-   self.progressBar.config(mode="indeterminate")
-   self.progressBar.start(30)
+   if not getattr(self, "_progressIndeterminateActive", False):
+    self.progressBar.config(mode="indeterminate")
+    self.progressBar.start(30)
+    self._progressIndeterminateActive = True
    self.progressText.set(message)
   else:
+   if getattr(self, "_progressIndeterminateActive", False):
+    self.progressBar.stop()
+    self._progressIndeterminateActive = False
    self.progressBar.config(mode="determinate")
    value = max(0, min(100, int(percent)))
    self.progressBar["value"] = value
    self.progressText.set("%s — %d%%" % (message, value))
 
  def showInstallResult(self, result):
+  self._progressIndeterminateActive = False
+  is_error = isinstance(result, BaseException) or getattr(result, "outcome_unknown", False) or (hasattr(result, "code") and getattr(result, "code", 0) not in (0, None))
+  is_success = bool(result) and not is_error
   if hasattr(self, "progressBar") and self.progressBar is not None:
+   try:
+    prev_val = self.progressBar["value"] if "value" in self.progressBar else None
+   except Exception:
+    try:
+     prev_val = self.progressBar["value"]
+    except Exception:
+     prev_val = None
    try:
     self.progressBar.stop()
     self.progressBar.config(mode="determinate")
-    if result:
+    if is_success:
      self.progressBar["value"] = 100
+    elif prev_val is not None:
+     self.progressBar["value"] = prev_val
    except Exception:
     pass
-  if result:
+  if is_error:
+   if getattr(result, "outcome_unknown", False):
+    self.progressText.set("Installation outcome unknown: %s Check the camera applications list before retrying." % result)
+   else:
+    self.progressText.set("Installation did not complete: %s" % result)
+  elif is_success:
    msg = "Installation completed. Verify the app on the camera."
    if isinstance(result, dict):
     apps = result.get("applications", [])
@@ -2116,7 +2755,7 @@ def checkRuntime(outFile):
  key = tlslite.parsePEMKey(pem, private=True)
  sample = b'Sony Open PMCA runtime check'
  result = {
-  'version': version or '1.1.0',
+  'version': version or '1.2.0',
   'python': platform.python_version(),
   'architecture': platform.machine(),
   'frozen': bool(getattr(sys, 'frozen', False)),

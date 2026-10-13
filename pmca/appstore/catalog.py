@@ -13,6 +13,7 @@ import certifi
 
 from .recipelab import HttpsRedirectHandler
 from ..apk import ApkParser
+from ..util.http import DownloadCancelledError
 
 SEED_APPS = {
  "com.voxivoid.recipelab": {
@@ -498,8 +499,10 @@ def syncCatalogMetadata(existingCatalog=None, timeout=10, abort_event=None, cach
  )
 
 
-def downloadCatalogApp(app, filename, progress=None, timeout=30):
+def downloadCatalogApp(app, filename, progress=None, timeout=30, abort_event=None):
  """Download and validate a catalog app APK with HTTPS verification, minSdk/cert check, and atomic file write."""
+ if abort_event is not None and abort_event.is_set():
+  raise DownloadCancelledError("Catalog app download cancelled")
  path = os.path.abspath(filename)
 
  # Extract app metadata from dict or App object
@@ -539,13 +542,19 @@ def downloadCatalogApp(app, filename, progress=None, timeout=30):
     length = response.headers.get("Content-Length")
     total = int(length) if length is not None else None
     while True:
+     if abort_event is not None and abort_event.is_set():
+      raise DownloadCancelledError("Catalog app download cancelled")
      chunk = response.read(64 * 1024)
      if not chunk:
       break
+     if abort_event is not None and abort_event.is_set():
+      raise DownloadCancelledError("Catalog app download cancelled")
      f.write(chunk)
      downloaded += len(chunk)
      if progress is not None:
       progress(downloaded, total)
+   if abort_event is not None and abort_event.is_set():
+    raise DownloadCancelledError("Catalog app download cancelled")
    if total is not None and downloaded != total:
     raise ValueError("Incomplete download for %s (%d of %d bytes)" % (app_name, downloaded, total))
    f.flush()
@@ -560,6 +569,8 @@ def downloadCatalogApp(app, filename, progress=None, timeout=30):
    cert = parser.getCert()
    if not cert:
     raise ValueError("APK signature certificate missing or invalid")
+   if abort_event is not None and abort_event.is_set():
+    raise DownloadCancelledError("Catalog app download cancelled")
   os.replace(partial, path)
   partial = None
   return {

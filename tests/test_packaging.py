@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import re
+import sys
 import unittest
 from unittest.mock import patch
 import yaml
@@ -41,6 +42,18 @@ class PackagingFilenamesTest(unittest.TestCase):
             mod.get_asset_name("linux", version="1.0.0", arch="x86_64"),
             "Sony-Open-PMCA-1.0.0-linux-x86_64.AppImage",
         )
+
+    def test_missing_package_version_fails_without_leaving_import_path_changed(self):
+        mod = load_build_module()
+        original_import = __import__
+        def import_without_pmca(name, *args, **kwargs):
+            if name == "pmca":
+                raise ImportError("package version unavailable")
+            return original_import(name, *args, **kwargs)
+        with patch.object(sys, "path", ["test-entry"]), patch("builtins.__import__", side_effect=import_without_pmca):
+            with self.assertRaisesRegex(RuntimeError, "version"):
+                mod.get_version()
+            self.assertEqual(sys.path, ["test-entry"])
 
     def test_default_asset_names_follow_current_package_version(self):
         mod = load_build_module()

@@ -73,7 +73,11 @@ def main():
     return
   else:
    pkg = args.appPackage
-  installCommand(args.driver, args.apkFile, pkg, args.outFile)
+  try:
+   installCommand(args.driver, args.apkFile, pkg, args.outFile)
+  except (CameraOperationError, CameraBusyException, ValueError) as e:
+   print('Error: %s' % e)
+   sys.exit(1)
  elif args.command == 'market':
   marketCommand(args.token)
  elif args.command == 'apk2spk':
